@@ -1,4 +1,6 @@
 from mongoengine import *
+from models.Question import Question
+from models.User import User
 
 
 class Answer(Document):
@@ -7,7 +9,8 @@ class Answer(Document):
     """
     meta = {'db_alias': 'tour',
             'collection': 'answer'}
-    question = ReferenceField(required=True, primary_key=True)
-    username = ReferenceField(required=True)
+    answer_id = IntField(required=True, primary_key=True)
+    question = ReferenceField(document_type=Question, required=True)
+    username = ReferenceField(document_type=User, required=True)
     answer = StringField(required=True)
 

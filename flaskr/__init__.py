@@ -16,6 +16,7 @@ def create_app(config_object='flaskr.settings'):
     # GraphQl Bind
     from app.UserSchema import user_schema
     from app.AdminSchema import admin_schema
+    from app.TourSchema import tour_schema
     app.add_url_rule(
         '/user/graphql',
         view_func=GraphQLView.as_view(
@@ -29,6 +30,14 @@ def create_app(config_object='flaskr.settings'):
         view_func=GraphQLView.as_view(
             'admingraphql',
             schema=admin_schema,
+            graphiql=True
+        )
+    )
+    app.add_url_rule(
+        '/tour/graphql',
+        view_func=GraphQLView.as_view(
+            'tourgraphql',
+            schema=tour_schema,
             graphiql=True
         )
     )
