@@ -15,11 +15,20 @@ def create_app(config_object='flaskr.settings'):
     auth = GraphQLAuth(app)
     # GraphQl Bind
     from app.UserSchema import user_schema
+    from app.AdminSchema import admin_schema
     app.add_url_rule(
-        '/graphql',
+        '/user/graphql',
         view_func=GraphQLView.as_view(
-            'graphql',
+            'usergraphql',
             schema=user_schema,
+            graphiql=True
+        )
+    )
+    app.add_url_rule(
+        '/admin/graphql',
+        view_func=GraphQLView.as_view(
+            'admingraphql',
+            schema=admin_schema,
             graphiql=True
         )
     )

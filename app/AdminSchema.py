@@ -3,12 +3,15 @@ from flask_graphql_auth import create_access_token, create_refresh_token, mutati
 from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean, Union, Int
 from graphene_mongo import MongoengineObjectType
 from werkzeug.security import generate_password_hash, check_password_hash
-from models.Code import Code
 from models.Admin import Admin as AdminModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.Code import Code as CodeModel
+from models.User import User as UserModel
 import string
 import random
+from .ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
+from .UserSchema import User
+
 """
 GraphQL Schema for the admin web portal
 includes all functionality of the portal: admin account creation and management, 
@@ -18,35 +21,6 @@ login creates a jwt access and refresh token.
 all other methods require a valid token
 
 """
-
-
-# TODO: queries
-
-
-class BooleanField(ObjectType):
-    boolean = Boolean()
-
-
-class ProtectedBool(Union):
-    class Meta:
-        types = (BooleanField, AuthInfoField)
-
-    @classmethod
-    def resolve_type(cls, instance, info):
-        return type(instance)
-
-
-class StringField(ObjectType):
-    string = String()
-
-
-class ProtectedString(Union):
-    class Meta:
-        types = (StringField, AuthInfoField)
-
-    @classmethod
-    def resolve_type(cls, instance, info):
-        return type(instance)
 
 
 class MuseumObject(MongoengineObjectType):
@@ -248,6 +222,39 @@ class CreateCode(Mutation):
         return CreateCode(ok=BooleanField(boolean=True), code=StringField(string=code_string))
 
 
+class DemoteUser(Mutation):
+    class Arguments:
+        username = String(required=True)
+        token = String(required=True)
+
+    ok = ProtectedBool()
+    user = Field(User)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, username):
+        user = UserModel.objects.get(username=username)
+        user.update(set__teacher=False)
+        user.save()
+        user = UserModel.objects.get(username=username)
+        return DemoteUser(ok=BooleanField(boolean=True), user=user)
+
+
+class DeleteUser(Mutation):
+    class Arguments:
+        username = String(required=True)
+        token = String(required=True)
+
+    ok = ProtectedBool()
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, username):
+        user = UserModel.objects.get(username=username)
+        user.delete()
+        return DeleteUser(ok=BooleanField(boolean=True))
+
+
 class Mutation(ObjectType):
     create_user = CreateAdmin.Field()
     auth = Auth.Field()
@@ -256,6 +263,8 @@ class Mutation(ObjectType):
     create_museum_object = CreateMuseumObject.Field()
     update_museum_object = UpdateMuseumObject.Field()
     create_code = CreateCode.Field()
+    demote_user = DemoteUser.Field()
+    delete_user = DeleteUser.Field()
 
 
 class Query(ObjectType):

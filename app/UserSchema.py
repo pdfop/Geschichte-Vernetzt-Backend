@@ -1,45 +1,16 @@
 from flask_graphql_auth import create_access_token, create_refresh_token, mutation_jwt_refresh_token_required, \
-    get_jwt_identity, AuthInfoField, mutation_jwt_required
-from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean, Union
+    get_jwt_identity, mutation_jwt_required
+from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean
 from graphene_mongo import MongoengineObjectType
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.Code import Code
 from models.User import User as UserModel
-
+from .ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
 """
 GraphQL Schema for user management. 
 Supports user creation, password changes, user - teacher promotion, login / auth and jwt management. 
 login returns access and refresh token. all other requests require a valid refresh token. 
 """
-
-
-# TODO: queries
-
-
-class BooleanField(ObjectType):
-    boolean = Boolean()
-
-
-class ProtectedBool(Union):
-    class Meta:
-        types = (BooleanField, AuthInfoField)
-
-    @classmethod
-    def resolve_type(cls, instance, info):
-        return type(instance)
-
-
-class StringField(ObjectType):
-    string = String()
-
-
-class ProtectedString(Union):
-    class Meta:
-        types = (StringField, AuthInfoField)
-
-    @classmethod
-    def resolve_type(cls, instance, info):
-        return type(instance)
 
 
 class User(MongoengineObjectType):
