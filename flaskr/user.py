@@ -13,25 +13,8 @@ user = Blueprint('user', __name__, template_folder='models', url_prefix='/user')
 # TODO: proper binding
 
 
-@user.route('/create', methods=['POST'])
-def create_user():
+@user.route('/', methods=['POST'])
+def user_endpoint():
     data = json.loads(request.data)
     return json.dumps(user_schema.execute(data['query']).data)
 
-
-@user.route('/promote', methods=['POST'])
-def promote_user():
-    data = json.loads(request.data)
-    return json.dumps(user_schema.execute(data['query']).data)
-
-
-@user.route('/update', methods=['POST'])
-def change_password():
-    data = json.loads(request.data)
-    return json.dumps(user_schema.execute(data['query']).data)
-
-
-@user.route('/login', methods=['POST'])
-def login():
-    data = json.loads(request.data)
-    return json.dumps(user_schema.execute(data['query']).data)

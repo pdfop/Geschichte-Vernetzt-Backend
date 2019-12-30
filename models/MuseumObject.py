@@ -9,7 +9,7 @@ class MuseumObject(Document):
     category = StringField(required=True)
     sub_category = StringField(required=True)
     meta = {'db_alias': 'object',
-            'collection': str(sub_category)}
+            'collection': 'nature.Zoo'}
     title = StringField(required=True)
     year = IntField()
     picture = URLField()
@@ -19,7 +19,7 @@ class MuseumObject(Document):
     # size is defined as "height x width x depth" in cm
     size = StringField()
     location = StringField()
+    description = StringField()
+    interdisciplinary_context = StringField()
 
-
-# TODO: test if collection switch works
-
+# TODO: collection switching

@@ -7,5 +7,5 @@ class Code(Document):
     """
     meta = {'db_alias': 'user',
             'collection': 'code'}
-    code = StringField(required=True)
+    code = StringField(required=True, primary_key=True)
 

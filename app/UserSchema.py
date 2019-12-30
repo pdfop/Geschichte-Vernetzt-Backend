@@ -12,6 +12,7 @@ Supports user creation, password changes, user - teacher promotion, login / auth
 login returns access and refresh token. all other requests require a valid refresh token. 
 """
 
+
 # TODO: queries
 
 
@@ -70,20 +71,22 @@ class PromoteUser(Mutation):
         code = String()
 
     ok = Field(ProtectedBool)
+    user = Field(User)
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, info, code):
+    def mutate(cls, _, info, code):
         username = get_jwt_identity()
-        if not (Code.objects(code=code) and UserModel.objects(username=username)):
+        if not Code.objects(code=code):
             return PromoteUser(ok=BooleanField(boolean=False))
         else:
-
-            Code.objects.delete(code=code)
+            code_doc = Code.objects.get(code=code)
+            code_doc.delete()
             user = UserModel.objects.get(username=username)
-            user.teacher = True
+            user.update(set__teacher=True)
             user.save()
-            return PromoteUser(ok=BooleanField(boolean=True))
+            user = UserModel.objects.get(username=username)
+            return PromoteUser(ok=BooleanField(boolean=True), user=user)
 
 
 class ChangePassword(Mutation):
@@ -119,7 +122,8 @@ class Auth(Mutation):
             return Auth(ok=False)
         else:
 
-            return Auth(access_token=create_access_token(username), refresh_token=create_refresh_token(username), ok=True)
+            return Auth(access_token=create_access_token(username), refresh_token=create_refresh_token(username),
+                        ok=True)
 
 
 class Refresh(Mutation):
