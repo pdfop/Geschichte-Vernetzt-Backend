@@ -1,4 +1,4 @@
-from flask_graphql_auth import mutation_jwt_required, get_jwt_identity
+from flask_graphql_auth import mutation_jwt_required, get_jwt_identity, query_jwt_required
 from graphene import Mutation, String, List, Int, Field, Schema, ObjectType
 from graphene_mongo import MongoengineObjectType
 from models.MuseumObject import MuseumObject as MuseumObjectModel
@@ -47,7 +47,8 @@ class CreateTour(Mutation):
         if not TourModel.objects(tour_id=tour_id):
             owner_name = get_jwt_identity()
             owner = UserModel.objects.get(username=owner_name)
-            tour = TourModel(tour_id=tour_id, owner=owner, name=name)
+            users = [owner]
+            tour = TourModel(tour_id=tour_id, owner=owner, name=name, users=users)
             tour.save()
             return CreateTour(tour=tour, ok=BooleanField(boolean=True))
         else:
@@ -111,13 +112,16 @@ class AddObject(Mutation):
     @mutation_jwt_required
     def mutate(cls, _, info, tour_id, object_id):
         tour = TourModel.objects.get(tour_id=tour_id)
-        museum_object = MuseumObjectModel.objects.get(object_id=object_id)
-        referenced = tour.referenced_objects
-        referenced.append(museum_object)
-        tour.update(set__referenced_objects=referenced)
-        tour.save()
-        tour = TourModel.objects.get(tour_id=tour_id)
-        return AddObject(ok=BooleanField(boolean=True), tour=tour)
+        if tour.owner.username == get_jwt_identity():
+            museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+            referenced = tour.referenced_objects
+            referenced.append(museum_object)
+            tour.update(set__referenced_objects=referenced)
+            tour.save()
+            tour = TourModel.objects.get(tour_id=tour_id)
+            return AddObject(ok=BooleanField(boolean=True), tour=tour)
+        else:
+            return AddObject(ok=BooleanField(boolean=False), tour=None)
 
 # TODO: bug where you cannot query the list of question of a turn in th return of this
 
@@ -168,6 +172,8 @@ class AddAnswer(Mutation):
         tour = TourModel.objects.get(tour_id=tour_id)
         return AddAnswer(tour=tour, ok=BooleanField(boolean=True))
 
+# TODO: Session Codes
+
 
 class AddMember(Mutation):
     class Arguments:
@@ -180,13 +186,33 @@ class AddMember(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        tour = TourModel.objects.get(id=tour)
+        tour = TourModel.objects.get(tour_id=tour)
         username = get_jwt_identity()
         user = UserModel.objects.get(username=username)
-        tour.update(set__users=tour.users.append(user))
+        users = tour.users
+        users.append(user)
+        tour.update(set__users=users)
         tour.save()
-        tour = TourModel.objects.get(id=tour)
+        tour.reload()
         return AddMember(ok=BooleanField(boolean=True), tour=tour)
+
+
+class SubmitReview(Mutation):
+    class Arguments:
+        tour = Int(required=True)
+        token = String(required=True)
+
+    ok = Field(ProtectedBool)
+    tour = Field(Tour)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, tour):
+        tour = TourModel.objects.get(tour_id=tour)
+        tour.update(set__status='pending')
+        tour.save()
+        tour.reload()
+        return SubmitReview(ok=BooleanField(boolean=True), tour=tour)
 
 
 class Mutation(ObjectType):
@@ -196,12 +222,31 @@ class Mutation(ObjectType):
     add_question = AddQuestion.Field()
     add_answer = AddAnswer.Field()
     add_object = AddObject.Field()
+    add_member = AddMember.Field()
+    submit_review = SubmitReview.Field()
+
 
 class Query(ObjectType):
-    tours = List(Tour)
+    tour = List(Tour, token=String(), tour=Int())
+    my_tours = List(Tour, token=String())
 
-    def resolve_tours(self, info):
-        return list(TourModel.objects.all())
+    @classmethod
+    @query_jwt_required
+    def resolve_my_tours(cls, _, info):
+        username = get_jwt_identity()
+        user = UserModel.objects.get(username=username)
+        return list(TourModel.objects(users__contains=user))
+
+    @classmethod
+    @query_jwt_required
+    def resolve_tour(cls, _, info, tour):
+        username = get_jwt_identity()
+        user = UserModel.objects.get(username=username)
+        tour = TourModel.objects.get(tour_id=tour)
+        if user in tour.users:
+            return [tour]
+        else:
+            return None
 
 
 tour_schema = Schema(query=Query, mutation=Mutation)
