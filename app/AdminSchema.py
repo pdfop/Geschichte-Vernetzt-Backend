@@ -11,6 +11,8 @@ import string
 import random
 from .ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
 from .UserSchema import User
+from models.Tour import Tour as TourModel
+from .TourSchema import Tour
 
 """
 GraphQL Schema for the admin web portal
@@ -304,6 +306,42 @@ class DeleteUser(Mutation):
         return DeleteUser(ok=BooleanField(boolean=True))
 
 
+class DenyReview(Mutation):
+    class Arguments:
+        token = String(required=True)
+        tour = Int(required=True)
+
+    ok = Field(ProtectedBool)
+    tour = Field(Tour)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, tour):
+        tour = TourModel.objects.get(tour_id=tour)
+        tour.update(set__status='private')
+        tour.save()
+        tour.reload()
+        return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+
+
+class AcceptReview(Mutation):
+    class Arguments:
+        token = String(required=True)
+        tour = Int(required=True)
+
+    ok = Field(ProtectedBool)
+    tour = Field(Tour)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, tour):
+        tour = TourModel.objects.get(tour_id=tour)
+        tour.update(set__status='featured')
+        tour.save()
+        tour.reload()
+        return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+
+
 class Mutation(ObjectType):
     create_user = CreateAdmin.Field()
     auth = Auth.Field()
@@ -314,18 +352,28 @@ class Mutation(ObjectType):
     create_code = CreateCode.Field()
     demote_user = DemoteUser.Field()
     delete_user = DeleteUser.Field()
+    deny_review = DenyReview.Field()
+    accept_review = AcceptReview.Field()
 
 
 class Query(ObjectType):
     users = List(Admin)
     user = List(Admin, username=String())
     objects = List(MuseumObject, object_id=Int())
+    pending = List(Tour)
+    featured = List(Tour)
+
+    def resolve_featured(self, info):
+        return list(TourModel.objects(status='featured'))
+
+    def resolve_pending(self, info):
+        return list(TourModel.objects(status='pending'))
 
     def resolve_objects(self, info, object_id):
-        return list(MuseumObjectModel.objects.get(object_id=object_id))
+        return MuseumObjectModel.objects(object_id=object_id)
 
     def resolve_user(self, info, username):
-        return list(AdminModel.objects.get(username=username))
+        return list(AdminModel.objects(username=username))
 
     def resolve_users(self, info):
         return list(AdminModel.objects.all())

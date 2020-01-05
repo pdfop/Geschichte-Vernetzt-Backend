@@ -1,4 +1,6 @@
 from mongoengine import *
+from models.User import User
+from models.Question import Question
 
 
 class Tour(Document):
@@ -7,12 +9,13 @@ class Tour(Document):
     """
     meta = {'db_alias': 'tour',
             'collection': 'tour'}
-    id = IntField(required=True, primary_key=True)
+    tour_id = IntField(required=True, primary_key=True)
     name = StringField(required=True)
-    owner = ReferenceField(required=True)
+    owner = ReferenceField(document_type=User, required=True)
     referenced_objects = ListField()
-    questions = ListField()
+    questions = ListField(ReferenceField(document_type=Question))
     answers = DictField()
-    users = ListField()
+    users = ListField(ReferenceField(document_type=User))
+    status = StringField(default='private')
 
 
