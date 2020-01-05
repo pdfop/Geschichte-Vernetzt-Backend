@@ -12,7 +12,8 @@ class MuseumObject(Document):
             'collection': 'nature.Zoo'}
     title = StringField(required=True)
     year = IntField()
-    picture = URLField()
+    # TODO: change this to URL field after testing
+    picture = StringField()
     art_type = StringField()
     creator = StringField()
     material = StringField()

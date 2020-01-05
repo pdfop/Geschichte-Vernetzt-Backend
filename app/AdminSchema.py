@@ -16,6 +16,7 @@ from .UserSchema import User
 GraphQL Schema for the admin web portal
 includes all functionality of the portal: admin account creation and management, 
                                           account promotion code creation,
+                                          user demotion and deletion, 
                                           object creation and management 
 login creates a jwt access and refresh token. 
 all other methods require a valid token
@@ -77,9 +78,10 @@ class CreateMuseumObject(Mutation):
                                               interdisciplinary_context=interdisciplinary_context)
             museum_object.save()
             return CreateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
+        else:
+            return CreateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
 
 
-# TODO: fix this ffs.
 class UpdateMuseumObject(Mutation):
     class Arguments:
         object_id = Int(required=True)
@@ -103,28 +105,75 @@ class UpdateMuseumObject(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, object_id, **kwargs):
+
         if not MuseumObjectModel.objects(object_id=object_id):
-            return "no"
+            return UpdateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
         else:
-            museum_object: MuseumObjectModel = MuseumObjectModel.objects(object_id=object_id).first()
-            category = kwargs.get('category', museum_object.category)
-            sub_category = kwargs.get('sub_category', museum_object.sub_category)
-            title = kwargs.get('title', museum_object.title)
-            year = kwargs.get('year', museum_object.year)
-            picture = kwargs.get('picture', museum_object.picture)
-            art_type = kwargs.get('art_type', museum_object.art_type)
-            creator = kwargs.get('creator', museum_object.creator)
-            material = kwargs.get('material', museum_object.material)
-            size = kwargs.get('size', museum_object.size)
-            location = kwargs.get('location', museum_object.location)
-            description = kwargs.get('description', museum_object.description)
-            interdisciplinary_context = kwargs.get('interdisciplinary_context', museum_object.interdisciplinary_context)
-            museum_object.update(set__category=category, set__sub_category=sub_category,
-                                 set__title=title, set__year=year, set__picture=picture, set__art_type=art_type,
-                                 set__creator=creator, set__material=material, set__size=size, set__location=location,
-                                 set__description=description,
-                                 set__interdisciplinary_context=interdisciplinary_context)
-            museum_object.save()
+            museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+
+            category = kwargs.get('category', None)
+            sub_category = kwargs.get('sub_category', None)
+            title = kwargs.get('title',None)
+            year = kwargs.get('year', None)
+            picture = kwargs.get('picture', None)
+            art_type = kwargs.get('art_type', None)
+            creator = kwargs.get('creator', None)
+            material = kwargs.get('material', None)
+            size = kwargs.get('size', None)
+            location = kwargs.get('location', None)
+            description = kwargs.get('description', None)
+            interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
+
+            if category is not None:
+                museum_object.update(set__category=category)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if sub_category is not None:
+                museum_object.update(set__sub_category=sub_category)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if title is not None:
+                museum_object.update(set__title=title)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if year is not None:
+                museum_object.update(set__year=year)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if picture is not None:
+                museum_object.update(set__picture=picture)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if art_type is not None:
+                museum_object.update(set__art_type=art_type)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if creator is not None:
+                museum_object.update(set__creator=creator)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if material is not None:
+                museum_object.update(set__material=material)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if size is not None:
+                museum_object.update(set__size=size)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if location is not None:
+                museum_object.update(set__location=location)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if description is not None:
+                museum_object.update(set__description=description)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+            if interdisciplinary_context is not None:
+                museum_object.update(set__interdisciplinary_context=interdisciplinary_context)
+                museum_object.save()
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+
+
             return UpdateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
 
 
