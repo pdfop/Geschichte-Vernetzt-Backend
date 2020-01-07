@@ -5,7 +5,7 @@ from graphene_mongo import MongoengineObjectType
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.Code import Code
 from models.User import User as UserModel
-from .ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
+from .ProtectedFields import ProtectedBool, BooleanField
 """
 GraphQL Schema for user management. 
 Supports user creation, password changes, user - teacher promotion, login / auth and jwt management. 
@@ -109,6 +109,24 @@ class Refresh(Mutation):
         current_user = get_jwt_identity()
         return Refresh(new_token=create_access_token(identity=current_user))
 
+# TODO: chain delete all tours and tours the user is referenced in
+
+
+class DeleteAccount(Mutation):
+    class Arguments:
+        token = String(required=True)
+
+    ok = Field(ProtectedBool)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info):
+        username = get_jwt_identity()
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            user.delete()
+        return DeleteAccount(ok=BooleanField(boolean=True))
+
 
 class Mutation(ObjectType):
     create_user = CreateUser.Field()
@@ -116,6 +134,7 @@ class Mutation(ObjectType):
     refresh = Refresh.Field()
     change_password = ChangePassword.Field()
     promote_user = PromoteUser.Field()
+    delete_account = DeleteAccount.Field()
 
 
 class Query(ObjectType):

@@ -9,7 +9,7 @@ class MuseumObject(Document):
     category = StringField(required=True)
     sub_category = StringField(required=True)
     meta = {'db_alias': 'object',
-            'collection': 'nature.Zoo'}
+            'collection': 'object'}
     title = StringField(required=True)
     year = IntField()
     # TODO: change this to URL field after testing

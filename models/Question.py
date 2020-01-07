@@ -1,4 +1,5 @@
 from mongoengine import *
+from .MuseumObject import MuseumObject
 
 
 class Question(Document):
@@ -7,6 +8,6 @@ class Question(Document):
     """
     meta = {'db_alias': 'tour',
             'collection': 'question'}
-    question_id = IntField(required=True,primary_key=True)
+    question_id = IntField(required=True, primary_key=True)
     question = StringField(required=True)
-    linked_objects = ListField()
+    linked_objects = ListField(ReferenceField(document_type=MuseumObject))

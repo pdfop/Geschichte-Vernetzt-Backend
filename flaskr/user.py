@@ -10,9 +10,6 @@ Handles teacher account promotion
 user = Blueprint('user', __name__, template_folder='models', url_prefix='/user')
 
 
-# TODO: proper binding
-
-
 @user.route('/', methods=['POST'])
 def user_endpoint():
     data = json.loads(request.data)

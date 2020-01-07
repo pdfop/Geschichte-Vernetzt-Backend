@@ -1,6 +1,6 @@
 from flask_graphql_auth import create_access_token, create_refresh_token, mutation_jwt_refresh_token_required, \
-    get_jwt_identity, AuthInfoField, mutation_jwt_required
-from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean, Union, Int
+    get_jwt_identity, mutation_jwt_required, AuthInfoField
+from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean, Int, Union
 from graphene_mongo import MongoengineObjectType
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.Admin import Admin as AdminModel
@@ -12,7 +12,7 @@ import random
 from .ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
 from .UserSchema import User
 from models.Tour import Tour as TourModel
-from .TourSchema import Tour
+from .TourSchema import Tour, MuseumObject
 
 """
 GraphQL Schema for the admin web portal
@@ -21,23 +21,11 @@ includes all functionality of the portal: admin account creation and management,
                                           user demotion and deletion, 
                                           object creation and management 
 login creates a jwt access and refresh token. 
-all other methods require a valid token
+most other methods require a valid token
 
 """
 
-
-class MuseumObject(MongoengineObjectType):
-    class Meta:
-        model = MuseumObjectModel
-
-
-class ProtectedMuseumObject(Union):
-    class Meta:
-        types = (MuseumObject, AuthInfoField)
-
-    @classmethod
-    def resolve_type(cls, instance, info):
-        return type(instance)
+# TODO ; ensure users cannot perform admin functions
 
 
 class CreateMuseumObject(Mutation):
@@ -175,7 +163,6 @@ class UpdateMuseumObject(Mutation):
                 museum_object.save()
                 museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
 
-
             return UpdateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
 
 
@@ -200,6 +187,26 @@ class CreateAdmin(Mutation):
             return CreateAdmin(user=user, ok=True)
         else:
             return CreateAdmin(user=None, ok=False)
+
+# TODO: chain delete references to the object in questions and tours
+
+
+class DeleteMuseumObject(Mutation):
+    class Arguments:
+        token = String(required=True)
+        object_id = Int(required=True)
+
+    ok = Field(ProtectedBool)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, object_id):
+        if MuseumObjectModel.objects(object_id=object_id):
+            museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+            museum_object.delete()
+            return DeleteMuseumObject(ok=BooleanField(boolean=True))
+        else:
+            return DeleteMuseumObject(ok=BooleanField(boolean=False))
 
 
 class ChangePassword(Mutation):
@@ -284,11 +291,16 @@ class DemoteUser(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, username):
-        user = UserModel.objects.get(username=username)
-        user.update(set__teacher=False)
-        user.save()
-        user = UserModel.objects.get(username=username)
-        return DemoteUser(ok=BooleanField(boolean=True), user=user)
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            user.update(set__teacher=False)
+            user.save()
+            user = UserModel.objects.get(username=username)
+            return DemoteUser(ok=BooleanField(boolean=True), user=user)
+        else:
+            return DemoteUser(ok=BooleanField(boolean=False), user=None)
+
+# TODO: chain delete tours the user owned and remove the user from member lists of tours he participated in
 
 
 class DeleteUser(Mutation):
@@ -301,9 +313,12 @@ class DeleteUser(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, username):
-        user = UserModel.objects.get(username=username)
-        user.delete()
-        return DeleteUser(ok=BooleanField(boolean=True))
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            user.delete()
+            return DeleteUser(ok=BooleanField(boolean=True))
+        else:
+            return DeleteUser(ok=BooleanField(boolean=False))
 
 
 class DenyReview(Mutation):
@@ -317,11 +332,14 @@ class DenyReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        tour = TourModel.objects.get(tour_id=tour)
-        tour.update(set__status='private')
-        tour.save()
-        tour.reload()
-        return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+        if TourModel.objects(tour_id=tour):
+            tour = TourModel.objects.get(tour_id=tour)
+            tour.update(set__status='private')
+            tour.save()
+            tour.reload()
+            return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+        else:
+            return DenyReview(ok=BooleanField(boolean=False), tour=None)
 
 
 class AcceptReview(Mutation):
@@ -335,11 +353,14 @@ class AcceptReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        tour = TourModel.objects.get(tour_id=tour)
-        tour.update(set__status='featured')
-        tour.save()
-        tour.reload()
-        return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+        if TourModel.objects(tour_id=tour):
+            tour = TourModel.objects.get(tour_id=tour)
+            tour.update(set__status='featured')
+            tour.save()
+            tour.reload()
+            return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+        else:
+            return DenyReview(ok=BooleanField(boolean=False), tour=None)
 
 
 class Mutation(ObjectType):
@@ -349,6 +370,7 @@ class Mutation(ObjectType):
     change_password = ChangePassword.Field()
     create_museum_object = CreateMuseumObject.Field()
     update_museum_object = UpdateMuseumObject.Field()
+    delete_museum_object = DeleteMuseumObject.Field()
     create_code = CreateCode.Field()
     demote_user = DemoteUser.Field()
     delete_user = DeleteUser.Field()

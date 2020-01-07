@@ -3,7 +3,6 @@ import os
 from flask_graphql import GraphQLView
 from flask_graphql_auth import GraphQLAuth
 from .user import user
-from .obj import obj
 from .extensions import mongo
 from .admin import admin
 
@@ -53,7 +52,6 @@ def create_app(config_object='flaskr.settings'):
 
     # adding blueprints for subapps
     app.register_blueprint(user)
-    app.register_blueprint(obj)
     app.register_blueprint(admin)
     return app
 
