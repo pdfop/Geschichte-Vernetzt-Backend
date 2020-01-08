@@ -10,7 +10,6 @@ class Tour(Document):
     """
     meta = {'db_alias': 'tour',
             'collection': 'tour'}
-    tour_id = IntField(required=True, primary_key=True)
     name = StringField(required=True)
     owner = ReferenceField(document_type=User, required=True)
     session_id = IntField(required=True)

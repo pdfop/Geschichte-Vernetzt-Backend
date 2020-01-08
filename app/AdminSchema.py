@@ -324,7 +324,7 @@ class DeleteUser(Mutation):
 class DenyReview(Mutation):
     class Arguments:
         token = String(required=True)
-        tour = Int(required=True)
+        tour = String(required=True)
 
     ok = Field(ProtectedBool)
     tour = Field(Tour)
@@ -332,8 +332,8 @@ class DenyReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        if TourModel.objects(tour_id=tour):
-            tour = TourModel.objects.get(tour_id=tour)
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
             tour.update(set__status='private')
             tour.save()
             tour.reload()
@@ -345,7 +345,7 @@ class DenyReview(Mutation):
 class AcceptReview(Mutation):
     class Arguments:
         token = String(required=True)
-        tour = Int(required=True)
+        tour = String(required=True)
 
     ok = Field(ProtectedBool)
     tour = Field(Tour)
@@ -353,8 +353,8 @@ class AcceptReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        if TourModel.objects(tour_id=tour):
-            tour = TourModel.objects.get(tour_id=tour)
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
             tour.update(set__status='featured')
             tour.save()
             tour.reload()

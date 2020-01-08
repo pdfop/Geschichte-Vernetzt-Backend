@@ -32,7 +32,6 @@ class MuseumObject(MongoengineObjectType):
 
 class CreateTour(Mutation):
     class Arguments:
-        tour_id = Int(required=True)
         token = String(required=True)
         name = String(required=True)
         session_id = Int(required=True)
@@ -42,44 +41,40 @@ class CreateTour(Mutation):
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, tour_id, name, session_id):
-        if not TourModel.objects(tour_id=tour_id):
-            owner_name = get_jwt_identity()
-            if UserModel.objects(username=owner_name):
-                owner = UserModel.objects.get(username=owner_name)
-                if owner.teacher:
-                    users = [owner]
-                    tour = TourModel(tour_id=tour_id, owner=owner, name=name, users=users, session_id=session_id)
-                    tour.save()
-                    return CreateTour(tour=tour, ok=BooleanField(boolean=True))
-                else:
-                    return CreateTour(tour=None, ok=BooleanField(boolean=False))
-        else:
-            return CreateTour(tour=None, ok=BooleanField(boolean=False))
+    def mutate(cls, _, info, name, session_id):
+        owner_name = get_jwt_identity()
+        if UserModel.objects(username=owner_name):
+            owner = UserModel.objects.get(username=owner_name)
+            if owner.teacher:
+                users = [owner]
+                tour = TourModel(owner=owner, name=name, users=users, session_id=session_id)
+                tour.save()
+                return CreateTour(tour=tour, ok=BooleanField(boolean=True))
+            else:
+                return CreateTour(tour=None, ok=BooleanField(boolean=False))
 
 
 class CreateAnswer(Mutation):
     class Arguments:
-        answer_id = Int(required=True)
         token = String(required=True)
         answer = String(required=True)
-        question = Int(required=True)
+        question = String(required=True)
 
     answer = Field(Answer)
     ok = ProtectedBool()
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, answer_id, answer, question):
+    def mutate(cls, _, info, answer, question):
         username = get_jwt_identity()
         if UserModel.objects(username=username):
             user = UserModel.objects.get(username=username)
-            if QuestionModel.objects(question_id=question):
-                question = QuestionModel.objects.get(question_id=question)
+            if QuestionModel.objects(id=question):
+                question = QuestionModel.objects.get(id=question)
             else:
                 return CreateAnswer(answer=None, ok=BooleanField(boolean=False))
             if not AnswerModel.objects(question=question, user=user):
-                answer = AnswerModel(question=question, user=user, answer=answer, answer_id=answer_id)
+                answer = AnswerModel(question=question, user=user, answer=answer)
                 answer.save()
                 return CreateAnswer(answer=answer, ok=BooleanField(boolean=True))
             else:
@@ -95,7 +90,6 @@ class CreateQuestion(Mutation):
     class Arguments:
         token = String(required=True)
         linked_objects = List(of_type=Int)
-        question_id = Int(required=True)
         question_text = String(required=True)
 
     question = Field(Question)
@@ -103,33 +97,24 @@ class CreateQuestion(Mutation):
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, question_id, question_text, linked_objects):
+    def mutate(cls, _, info, question_text, linked_objects):
         username = get_jwt_identity()
         if UserModel.objects(username=username):
             user = UserModel.objects.get(username=username)
             if user.teacher:
-                if not QuestionModel.objects(question_id=question_id):
-                    question = QuestionModel(question_id=question_id, linked_objects=linked_objects,
-                                             question=question_text)
-                    question.save()
-                    return CreateQuestion(question=question,
-                                          ok=BooleanField(boolean=True))
-                else:
-                    question = QuestionModel.objects.get(question_id=question_id)
-                    question.update(set__question=question_text)
-                    question.save()
-                    question.reload()
-                    question.update(set__linked_objects=linked_objects)
-                    question.save()
-                    question.reload()
-                    return CreateQuestion(question=question, ok=BooleanField(boolean=True))
+                question = QuestionModel(linked_objects=linked_objects,
+                                         question=question_text)
+                question.save()
+                return CreateQuestion(question=question,
+                                      ok=BooleanField(boolean=True))
+
             else:
                 return CreateQuestion(question=None, ok=BooleanField(boolean=False))
 
 
 class AddObject(Mutation):
     class Arguments:
-        tour_id = Int(required=True)
+        tour_id = String(required=True)
         object_id = Int(required=True)
         token = String(required=True)
 
@@ -139,8 +124,8 @@ class AddObject(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour_id, object_id):
-        if TourModel.objects(tour_id=tour_id):
-            tour = TourModel.objects.get(tour_id=tour_id)
+        if TourModel.objects(id=tour_id):
+            tour = TourModel.objects.get(id=tour_id)
             if tour.owner.username == get_jwt_identity():
                 if MuseumObjectModel.objects(object_id=object_id):
                     museum_object = MuseumObjectModel.objects.get(object_id=object_id)
@@ -148,7 +133,7 @@ class AddObject(Mutation):
                     referenced.append(museum_object)
                     tour.update(set__referenced_objects=referenced)
                     tour.save()
-                    tour = TourModel.objects.get(tour_id=tour_id)
+                    tour = TourModel.objects.get(id=tour_id)
                     return AddObject(ok=BooleanField(boolean=True), tour=tour)
                 else:
                     return AddObject(ok=BooleanField(boolean=False), tour=None)
@@ -163,8 +148,8 @@ class AddObject(Mutation):
 
 class AddQuestion(Mutation):
     class Arguments:
-        tour_id = Int(required=True)
-        question = Int(required=True)
+        tour_id = String(required=True)
+        question = String(required=True)
         token = String(required=True)
 
     ok = Field(ProtectedBool)
@@ -173,16 +158,16 @@ class AddQuestion(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour_id, question):
-        if TourModel.objects(tour_id=tour_id):
-            tour = TourModel.objects.get(tour_id=tour_id)
+        if TourModel.objects(id=tour_id):
+            tour = TourModel.objects.get(id=tour_id)
             if tour.owner.username == get_jwt_identity():
-                if QuestionModel.objects(question_id=question):
-                    question = QuestionModel.objects.get(question_id=question)
+                if QuestionModel.objects(id=question):
+                    question = QuestionModel.objects.get(id=question)
                     questions = tour.questions
                     questions.append(question)
                     tour.update(set__questions=questions)
                     tour.save()
-                    tour = TourModel.objects.get(tour_id=tour_id)
+                    tour = TourModel.objects.get(id=tour_id)
                     return AddQuestion(ok=BooleanField(boolean=True), tour=tour)
                 else:
                     return AddQuestion(ok=BooleanField(boolean=False), tour=None)
@@ -194,9 +179,9 @@ class AddQuestion(Mutation):
 
 class AddAnswer(Mutation):
     class Arguments:
-        answer_id = Int(required=True)
-        tour_id = Int(required=True)
-        question_id = Int(required=True)
+        answer_id = String(required=True)
+        tour_id = String(required=True)
+        question_id = String(required=True)
         token = String(required=True)
 
     ok = Field(ProtectedBool)
@@ -205,14 +190,17 @@ class AddAnswer(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour_id, question_id, answer_id):
-        if TourModel.objects(tour_id=tour_id):
-            tour = TourModel.objects.get(tour_id=tour_id)
+        if TourModel.objects(id=tour_id):
+            tour = TourModel.objects.get(id=tour_id)
             username = get_jwt_identity()
             if UserModel.objects(username=username):
                 user = UserModel.objects.get(username=username)
                 if user in tour.users:
                     answers = tour.answers
-                    answers[question_id].update({user.username: answer_id})
+                    if question_id in answers.keys():
+                        answers[question_id].update({user.username: answer_id})
+                    else:
+                        answers[question_id] = {user.username: answer_id}
                     tour.update(set__answers=answers)
                     tour.save()
                     tour.reload()
@@ -227,7 +215,7 @@ class AddAnswer(Mutation):
 
 class AddMember(Mutation):
     class Arguments:
-        tour = Int(required=True)
+        tour = String(required=True)
         token = String(required=True)
         session_id = Int(required=True)
 
@@ -237,8 +225,8 @@ class AddMember(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour, session_id):
-        if TourModel.objects(tour_id=tour):
-            tour = TourModel.objects.get(tour_id=tour)
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
             if tour.session_id == session_id:
                 username = get_jwt_identity()
                 if UserModel.objects(username=username):
@@ -262,7 +250,7 @@ class AddMember(Mutation):
 
 class SubmitReview(Mutation):
     class Arguments:
-        tour = Int(required=True)
+        tour = String(required=True)
         token = String(required=True)
 
     ok = Field(ProtectedBool)
@@ -271,8 +259,8 @@ class SubmitReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        if TourModel.objects(tour_id=tour):
-            tour = TourModel.objects.get(tour_id=tour)
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
             username = get_jwt_identity()
             if tour.owner.username == username:
                 tour.update(set__status='pending')
@@ -288,7 +276,7 @@ class SubmitReview(Mutation):
 class UpdateSessionId(Mutation):
     class Arguments:
         token = String(required=True)
-        tour = Int(required=True)
+        tour = String(required=True)
         session_id = Int(required=True)
 
     ok = Field(ProtectedBool)
@@ -297,8 +285,8 @@ class UpdateSessionId(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour, session_id):
-        if TourModel.objects(tour_id=tour):
-            tour = TourModel.objects.get(tour_id=tour)
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
             username = get_jwt_identity()
             if tour.owner.username == username:
                 tour.update(set__session_id=session_id)
@@ -314,7 +302,7 @@ class UpdateSessionId(Mutation):
 class RemoveMuseumObject(Mutation):
     class Arguments:
         token = String(required=True)
-        tour = Int(required=True)
+        tour = String(required=True)
         object_id = Int(required=True)
 
     ok = Field(ProtectedBool)
@@ -323,8 +311,8 @@ class RemoveMuseumObject(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour, object_id):
-        if TourModel.objects(tour_id=tour):
-            tour = TourModel.objects.get(tour_id=tour)
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
             username = get_jwt_identity()
             if tour.owner.username == username:
                 if MuseumObjectModel.objects(object_id=object_id):
@@ -343,14 +331,15 @@ class RemoveMuseumObject(Mutation):
         else:
             return RemoveMuseumObject(tour=None, ok=BooleanField(boolean=False))
 
+
 # TODO: chain delete answers to the question
 
 
 class RemoveQuestion(Mutation):
     class Arguments:
         token = String(required=True)
-        tour = Int(required=True)
-        question_id = Int(required=True)
+        tour = String(required=True)
+        question_id = String(required=True)
 
     ok = Field(ProtectedBool)
     tour = Field(Tour)
@@ -358,12 +347,12 @@ class RemoveQuestion(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour, question_id):
-        if TourModel.objects(tour_id=tour):
-            tour = TourModel.objects.get(tour_id=tour)
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
             username = get_jwt_identity()
             if tour.owner.username == username:
-                if QuestionModel.objects(question_id=question_id):
-                    question = QuestionModel.objects.get(question_id=question_id)
+                if QuestionModel.objects(id=question_id):
+                    question = QuestionModel.objects.get(id=question_id)
                     questions = tour.questions
                     if question in questions:
                         questions.remove(question)
@@ -382,7 +371,7 @@ class RemoveQuestion(Mutation):
 class RemoveUser(Mutation):
     class Arguments:
         token = String(required=True)
-        tour = Int(required=True)
+        tour = String(required=True)
         username = String(required=True)
 
     ok = Field(ProtectedBool)
@@ -391,8 +380,8 @@ class RemoveUser(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour, username):
-        if TourModel.objects(tour_id=tour):
-            tour = TourModel.objects.get(tour_id=tour)
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
             owner = get_jwt_identity()
             if tour.owner.username == owner:
                 if UserModel.objects(username=username):
@@ -428,7 +417,7 @@ class Mutation(ObjectType):
 
 
 class Query(ObjectType):
-    tour = List(Tour, token=String(), tour=Int())
+    tour = List(Tour, token=String(), tour=String())
     my_tours = List(Tour, token=String())
     museum_object = List(MuseumObject, object_id=Int())
     owned_tours = List(Tour, token=String())
@@ -450,7 +439,7 @@ class Query(ObjectType):
     def resolve_tour(cls, _, info, tour):
         username = get_jwt_identity()
         user = UserModel.objects.get(username=username)
-        tour = TourModel.objects.get(tour_id=tour)
+        tour = TourModel.objects.get(id=tour)
         if user in tour.users:
             return [tour]
         else:

@@ -9,8 +9,6 @@ class Answer(Document):
     """
     meta = {'db_alias': 'tour',
             'collection': 'answer'}
-    answer_id = IntField(required=True, primary_key=True)
     question = ReferenceField(document_type=Question, required=True)
     user = ReferenceField(document_type=User, required=True)
     answer = StringField(required=True)
-
