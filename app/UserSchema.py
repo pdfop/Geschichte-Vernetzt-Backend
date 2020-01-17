@@ -1,28 +1,22 @@
 from flask_graphql_auth import create_access_token, create_refresh_token, mutation_jwt_refresh_token_required, \
     get_jwt_identity, mutation_jwt_required
 from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean
-from graphene_mongo import MongoengineObjectType
 from werkzeug.security import generate_password_hash, check_password_hash
-from models.Code import Code
-from models.User import User as UserModel
 from .ProtectedFields import ProtectedBool, BooleanField
+from app.Fields import User, Code
+from models.User import User as UserModel
+from models.Code import Code as CodeModel
 """
 GraphQL Schema for user management. 
-Supports user creation, password changes, user - teacher promotion, login / auth and jwt management. 
+Supports user creation, password changes, user - producer promotion, login / auth and jwt management. 
 login returns access and refresh token. all other requests require a valid refresh token. 
-"""
-
-
-class User(MongoengineObjectType):
-    class Meta:
-        model = UserModel
+"""git
 
 
 class CreateUser(Mutation):
     class Arguments:
         username = String(required=True)
         password = String(required=True)
-        teacher = Boolean()
 
     user = Field(lambda: User)
     ok = Boolean()
@@ -54,7 +48,7 @@ class PromoteUser(Mutation):
             code_doc = Code.objects.get(code=code)
             code_doc.delete()
             user = UserModel.objects.get(username=username)
-            user.update(set__teacher=True)
+            user.update(set__producer=True)
             user.save()
             user = UserModel.objects.get(username=username)
             return PromoteUser(ok=BooleanField(boolean=True), user=user)

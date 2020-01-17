@@ -1,33 +1,14 @@
 from flask_graphql_auth import mutation_jwt_required, get_jwt_identity, query_jwt_required
 from graphene import Mutation, String, List, Int, Field, Schema, ObjectType
-from graphene_mongo import MongoengineObjectType
+from app.ProtectedFields import ProtectedBool
+from app.ProtectedFields import BooleanField
+from models.User import User as UserModel
+from models.Tour import Tour as TourModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.Question import Question as QuestionModel
 from models.Answer import Answer as AnswerModel
-from models.Tour import Tour as TourModel
-from models.User import User as UserModel
-from app.ProtectedFields import ProtectedBool
-from app.ProtectedFields import BooleanField
-
-
-class Tour(MongoengineObjectType):
-    class Meta:
-        model = TourModel
-
-
-class Question(MongoengineObjectType):
-    class Meta:
-        model = QuestionModel
-
-
-class Answer(MongoengineObjectType):
-    class Meta:
-        model = AnswerModel
-
-
-class MuseumObject(MongoengineObjectType):
-    class Meta:
-        model = MuseumObjectModel
+from models.Admin import Admin as AdminModel
+from app.Fields import Tour, User, Question, Answer, TourFeedback, MuseumObject
 
 
 class CreateTour(Mutation):
@@ -45,7 +26,7 @@ class CreateTour(Mutation):
         owner_name = get_jwt_identity()
         if UserModel.objects(username=owner_name):
             owner = UserModel.objects.get(username=owner_name)
-            if owner.teacher:
+            if owner.producer:
                 users = [owner]
                 tour = TourModel(owner=owner, name=name, users=users, session_id=session_id)
                 tour.save()
@@ -86,10 +67,13 @@ class CreateAnswer(Mutation):
             return CreateAnswer(answer=None, ok=BooleanField(boolean=False))
 
 
+# TODO: object linking
+
+
 class CreateQuestion(Mutation):
     class Arguments:
         token = String(required=True)
-        linked_objects = List(of_type=Int)
+        linked_objects = List(of_type=String)
         question_text = String(required=True)
 
     question = Field(Question)
@@ -101,7 +85,7 @@ class CreateQuestion(Mutation):
         username = get_jwt_identity()
         if UserModel.objects(username=username):
             user = UserModel.objects.get(username=username)
-            if user.teacher:
+            if user.producer:
                 question = QuestionModel(linked_objects=linked_objects,
                                          question=question_text)
                 question.save()
@@ -115,7 +99,7 @@ class CreateQuestion(Mutation):
 class AddObject(Mutation):
     class Arguments:
         tour_id = String(required=True)
-        object_id = Int(required=True)
+        object_id = String(required=True)
         token = String(required=True)
 
     ok = Field(ProtectedBool)
@@ -141,9 +125,6 @@ class AddObject(Mutation):
                 return AddObject(ok=BooleanField(boolean=False), tour=None)
         else:
             return AddObject(ok=BooleanField(boolean=False), tour=None)
-
-
-# TODO: bug where you cannot query the list of question of a tour in the return of this
 
 
 class AddQuestion(Mutation):
@@ -303,7 +284,7 @@ class RemoveMuseumObject(Mutation):
     class Arguments:
         token = String(required=True)
         tour = String(required=True)
-        object_id = Int(required=True)
+        object_id = String(required=True)
 
     ok = Field(ProtectedBool)
     tour = Field(Tour)
@@ -419,7 +400,7 @@ class Mutation(ObjectType):
 class Query(ObjectType):
     tour = List(Tour, token=String(), tour=String())
     my_tours = List(Tour, token=String())
-    museum_object = List(MuseumObject, object_id=Int())
+    museum_object = List(MuseumObject, object_id=String())
     owned_tours = List(Tour, token=String())
 
     def revolve_museum_object(cls, _, info, **kwargs):

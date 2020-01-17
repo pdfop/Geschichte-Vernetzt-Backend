@@ -1,18 +1,16 @@
 from flask_graphql_auth import create_access_token, create_refresh_token, mutation_jwt_refresh_token_required, \
-    get_jwt_identity, mutation_jwt_required, AuthInfoField
-from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean, Int, Union
-from graphene_mongo import MongoengineObjectType
+    get_jwt_identity, mutation_jwt_required, get_jwt_claims
+from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean, Int
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.Admin import Admin as AdminModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.Code import Code as CodeModel
 from models.User import User as UserModel
+from models.Tour import Tour as TourModel
 import string
 import random
-from .ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
-from .UserSchema import User
-from models.Tour import Tour as TourModel
-from .TourSchema import Tour, MuseumObject
+from app.ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
+from app.Fields import Tour, MuseumObject, Admin, User, Code
 
 """
 GraphQL Schema for the admin web portal
@@ -25,23 +23,24 @@ most other methods require a valid token
 
 """
 
+
 # TODO ; ensure users cannot perform admin functions
 
 
 class CreateMuseumObject(Mutation):
     class Arguments:
-        object_id = Int(required=True)
+        object_id = String(required=True)
         category = String(required=True)
         sub_category = String(required=True)
         title = String(required=True)
         token = String(required=True)
-        year = Int()
-        picture = String()
-        art_type = String()
-        creator = String()
-        material = String()
+        year = List(String)
+        picture = List(String)
+        art_type = List(String)
+        creator = List(String)
+        material = List(String)
         size = String()
-        location = String()
+        location = List(String)
         description = String()
         interdisciplinary_context = String()
 
@@ -60,32 +59,39 @@ class CreateMuseumObject(Mutation):
         location = kwargs.get('location', None)
         description = kwargs.get('description', None)
         interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
-        if not MuseumObjectModel.objects(object_id=object_id):
-            museum_object = MuseumObjectModel(object_id=object_id, category=category, sub_category=sub_category,
-                                              title=title, year=year, picture=picture, art_type=art_type,
-                                              creator=creator, material=material, size=size, location=location,
-                                              description=description,
-                                              interdisciplinary_context=interdisciplinary_context)
-            museum_object.save()
-            return CreateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
+        admin_claim = {'admin': True}
+
+        if get_jwt_claims() == admin_claim:
+
+            if not MuseumObjectModel.objects(object_id=object_id):
+                museum_object = MuseumObjectModel(object_id=object_id, category=category, sub_category=sub_category,
+                                                  title=title, year=year, picture=picture, art_type=art_type,
+                                                  creator=creator, material=material, size=size, location=location,
+                                                  description=description,
+                                                  interdisciplinary_context=interdisciplinary_context)
+                museum_object.save()
+                return CreateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
+
+            else:
+                return CreateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
         else:
             return CreateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
 
 
 class UpdateMuseumObject(Mutation):
     class Arguments:
-        object_id = Int(required=True)
+        object_id = String(required=True)
         token = String(required=True)
         category = String()
         sub_category = String()
         title = String()
-        year = Int()
-        picture = String()
-        art_type = String()
-        creator = String()
-        material = String()
+        year = String()
+        picture = List(String)
+        art_type = List(String)
+        creator = List(String)
+        material = List(String)
         size = String()
-        location = String()
+        location = List(String)
         description = String()
         interdisciplinary_context = String()
 
@@ -96,86 +102,85 @@ class UpdateMuseumObject(Mutation):
     @mutation_jwt_required
     def mutate(cls, _, info, object_id, **kwargs):
 
-        if not MuseumObjectModel.objects(object_id=object_id):
-            return UpdateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
+        admin_claim = {'admin': True}
+
+        if get_jwt_claims() == admin_claim:
+            if not MuseumObjectModel.objects(object_id=object_id):
+                return UpdateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
+            else:
+                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+
+                category = kwargs.get('category', None)
+                sub_category = kwargs.get('sub_category', None)
+                title = kwargs.get('title', None)
+                year = kwargs.get('year', None)
+                picture = kwargs.get('picture', None)
+                art_type = kwargs.get('art_type', None)
+                creator = kwargs.get('creator', None)
+                material = kwargs.get('material', None)
+                size = kwargs.get('size', None)
+                location = kwargs.get('location', None)
+                description = kwargs.get('description', None)
+                interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
+
+                if category is not None:
+                    museum_object.update(set__category=category)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if sub_category is not None:
+                    museum_object.update(set__sub_category=sub_category)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if title is not None:
+                    museum_object.update(set__title=title)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if year is not None:
+                    museum_object.update(set__year=year)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if picture is not None:
+                    museum_object.update(set__picture=picture)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if art_type is not None:
+                    museum_object.update(set__art_type=art_type)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if creator is not None:
+                    museum_object.update(set__creator=creator)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if material is not None:
+                    museum_object.update(set__material=material)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if size is not None:
+                    museum_object.update(set__size=size)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if location is not None:
+                    museum_object.update(set__location=location)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if description is not None:
+                    museum_object.update(set__description=description)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if interdisciplinary_context is not None:
+                    museum_object.update(set__interdisciplinary_context=interdisciplinary_context)
+                    museum_object.save()
+                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+
+                return UpdateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
         else:
-            museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-
-            category = kwargs.get('category', None)
-            sub_category = kwargs.get('sub_category', None)
-            title = kwargs.get('title',None)
-            year = kwargs.get('year', None)
-            picture = kwargs.get('picture', None)
-            art_type = kwargs.get('art_type', None)
-            creator = kwargs.get('creator', None)
-            material = kwargs.get('material', None)
-            size = kwargs.get('size', None)
-            location = kwargs.get('location', None)
-            description = kwargs.get('description', None)
-            interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
-
-            if category is not None:
-                museum_object.update(set__category=category)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if sub_category is not None:
-                museum_object.update(set__sub_category=sub_category)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if title is not None:
-                museum_object.update(set__title=title)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if year is not None:
-                museum_object.update(set__year=year)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if picture is not None:
-                museum_object.update(set__picture=picture)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if art_type is not None:
-                museum_object.update(set__art_type=art_type)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if creator is not None:
-                museum_object.update(set__creator=creator)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if material is not None:
-                museum_object.update(set__material=material)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if size is not None:
-                museum_object.update(set__size=size)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if location is not None:
-                museum_object.update(set__location=location)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if description is not None:
-                museum_object.update(set__description=description)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-            if interdisciplinary_context is not None:
-                museum_object.update(set__interdisciplinary_context=interdisciplinary_context)
-                museum_object.save()
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-
-            return UpdateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
-
-
-class Admin(MongoengineObjectType):
-    class Meta:
-        model = AdminModel
+            return UpdateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
 
 
 class CreateAdmin(Mutation):
     class Arguments:
         username = String(required=True)
         password = String(required=True)
-        teacher = Boolean()
 
     user = Field(lambda: Admin)
     ok = Boolean()
@@ -188,23 +193,28 @@ class CreateAdmin(Mutation):
         else:
             return CreateAdmin(user=None, ok=False)
 
+
 # TODO: chain delete references to the object in questions and tours
 
 
 class DeleteMuseumObject(Mutation):
     class Arguments:
         token = String(required=True)
-        object_id = Int(required=True)
+        object_id = String(required=True)
 
     ok = Field(ProtectedBool)
 
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, object_id):
-        if MuseumObjectModel.objects(object_id=object_id):
-            museum_object = MuseumObjectModel.objects.get(object_id=object_id)
-            museum_object.delete()
-            return DeleteMuseumObject(ok=BooleanField(boolean=True))
+        admin_claim = {'admin': True}
+        if get_jwt_claims() == admin_claim:
+            if MuseumObjectModel.objects(object_id=object_id):
+                museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+                museum_object.delete()
+                return DeleteMuseumObject(ok=BooleanField(boolean=True))
+            else:
+                return DeleteMuseumObject(ok=BooleanField(boolean=False))
         else:
             return DeleteMuseumObject(ok=BooleanField(boolean=False))
 
@@ -241,8 +251,9 @@ class Auth(Mutation):
                 AdminModel.objects(username=username)[0].password, password)):
             return Auth(ok=False)
         else:
-
-            return Auth(access_token=create_access_token(username), refresh_token=create_refresh_token(username),
+            admin_claim = {'admin': True}
+            return Auth(access_token=create_access_token(username, user_claims=admin_claim),
+                        refresh_token=create_refresh_token(username, user_claims=admin_claim),
                         ok=True)
 
 
@@ -256,28 +267,33 @@ class Refresh(Mutation):
     @mutation_jwt_refresh_token_required
     def mutate(cls, info):
         current_user = get_jwt_identity()
-        return Refresh(new_token=create_access_token(identity=current_user))
-
-
-class Code(MongoengineObjectType):
-    class Meta:
-        model = CodeModel
+        claim = get_jwt_claims()
+        admin_claim = {'admin': True}
+        if claim == admin_claim:
+            return Refresh(new_token=create_access_token(identity=current_user, user_claims=admin_claim))
+        else:
+            return Refresh(new_token=None)
 
 
 class CreateCode(Mutation):
     class Arguments:
         token = String(required=True)
+
     ok = ProtectedBool()
     code = ProtectedString()
 
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info):
-        letters = string.ascii_lowercase
-        code_string = ''.join(random.choice(letters) for i in range(5))
-        code = CodeModel(code=code_string)
-        code.save()
-        return CreateCode(ok=BooleanField(boolean=True), code=StringField(string=code_string))
+        admin_claim = {'admin': True}
+        if get_jwt_claims() == admin_claim:
+            letters = string.ascii_lowercase
+            code_string = ''.join(random.choice(letters) for i in range(5))
+            code = CodeModel(code=code_string)
+            code.save()
+            return CreateCode(ok=BooleanField(boolean=True), code=StringField(string=code_string))
+        else:
+            return CreateCode(ok=BooleanField(boolean=False), code=None)
 
 
 class DemoteUser(Mutation):
@@ -291,14 +307,19 @@ class DemoteUser(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, username):
-        if UserModel.objects(username=username):
-            user = UserModel.objects.get(username=username)
-            user.update(set__teacher=False)
-            user.save()
-            user = UserModel.objects.get(username=username)
-            return DemoteUser(ok=BooleanField(boolean=True), user=user)
+        admin_claim = {'admin': True}
+        if get_jwt_claims() == admin_claim:
+            if UserModel.objects(username=username):
+                user = UserModel.objects.get(username=username)
+                user.update(set__producer=False)
+                user.save()
+                user = UserModel.objects.get(username=username)
+                return DemoteUser(ok=BooleanField(boolean=True), user=user)
+            else:
+                return DemoteUser(ok=BooleanField(boolean=False), user=None)
         else:
             return DemoteUser(ok=BooleanField(boolean=False), user=None)
+
 
 # TODO: chain delete tours the user owned and remove the user from member lists of tours he participated in
 
@@ -313,10 +334,14 @@ class DeleteUser(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, username):
-        if UserModel.objects(username=username):
-            user = UserModel.objects.get(username=username)
-            user.delete()
-            return DeleteUser(ok=BooleanField(boolean=True))
+        admin_claim = {'admin': True}
+        if get_jwt_claims() == admin_claim:
+            if UserModel.objects(username=username):
+                user = UserModel.objects.get(username=username)
+                user.delete()
+                return DeleteUser(ok=BooleanField(boolean=True))
+            else:
+                return DeleteUser(ok=BooleanField(boolean=False))
         else:
             return DeleteUser(ok=BooleanField(boolean=False))
 
@@ -332,12 +357,16 @@ class DenyReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        if TourModel.objects(id=tour):
-            tour = TourModel.objects.get(id=tour)
-            tour.update(set__status='private')
-            tour.save()
-            tour.reload()
-            return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+        admin_claim = {'admin': True}
+        if get_jwt_claims() == admin_claim:
+            if TourModel.objects(id=tour):
+                tour = TourModel.objects.get(id=tour)
+                tour.update(set__status='private')
+                tour.save()
+                tour.reload()
+                return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+            else:
+                return DenyReview(ok=BooleanField(boolean=False), tour=None)
         else:
             return DenyReview(ok=BooleanField(boolean=False), tour=None)
 
@@ -353,12 +382,16 @@ class AcceptReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        if TourModel.objects(id=tour):
-            tour = TourModel.objects.get(id=tour)
-            tour.update(set__status='featured')
-            tour.save()
-            tour.reload()
-            return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+        admin_claim = {'admin': True}
+        if get_jwt_claims() == admin_claim:
+            if TourModel.objects(id=tour):
+                tour = TourModel.objects.get(id=tour)
+                tour.update(set__status='featured')
+                tour.save()
+                tour.reload()
+                return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+            else:
+                return DenyReview(ok=BooleanField(boolean=False), tour=None)
         else:
             return DenyReview(ok=BooleanField(boolean=False), tour=None)
 
@@ -381,7 +414,7 @@ class Mutation(ObjectType):
 class Query(ObjectType):
     users = List(Admin)
     user = List(Admin, username=String())
-    objects = List(MuseumObject, object_id=Int())
+    objects = List(MuseumObject, object_id=String())
     pending = List(Tour)
     featured = List(Tour)
 

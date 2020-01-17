@@ -1,4 +1,6 @@
 from mongoengine import *
+#from models.MuseumObject import MuseumObject
+#from models.Tour import Tour
 
 
 class User(Document):
@@ -9,4 +11,6 @@ class User(Document):
             'collection': 'user'}
     username = StringField(required=True)
     password = StringField(required=True)
-    teacher = BooleanField(default=False)
+    producer = BooleanField(default=False)
+    #favourite_objects = ListField(ReferenceField(document_type=MuseumObject))
+    #favourite_tours = ListField(ReferenceField(document_type=Tour))
