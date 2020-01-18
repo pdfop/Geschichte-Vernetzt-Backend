@@ -7,10 +7,13 @@ from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.Code import Code as CodeModel
 from models.User import User as UserModel
 from models.Tour import Tour as TourModel
+from models.Question import Question as QuestionModel
+from models.AppFeedback import AppFeedback as AppFeedbackModel
+from models.Answer import Answer as AnswerModel
 import string
 import random
 from app.ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
-from app.Fields import Tour, MuseumObject, Admin, User, Code
+from app.Fields import Tour, MuseumObject, Admin, User, Code, AppFeedback
 
 """
 GraphQL Schema for the admin web portal
@@ -23,8 +26,7 @@ most other methods require a valid token
 
 """
 
-
-# TODO ; ensure users cannot perform admin functions
+admin_claim = {'admin': True}
 
 
 class CreateMuseumObject(Mutation):
@@ -59,7 +61,6 @@ class CreateMuseumObject(Mutation):
         location = kwargs.get('location', None)
         description = kwargs.get('description', None)
         interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
-        admin_claim = {'admin': True}
 
         if get_jwt_claims() == admin_claim:
 
@@ -101,9 +102,6 @@ class UpdateMuseumObject(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, object_id, **kwargs):
-
-        admin_claim = {'admin': True}
-
         if get_jwt_claims() == admin_claim:
             if not MuseumObjectModel.objects(object_id=object_id):
                 return UpdateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
@@ -194,9 +192,6 @@ class CreateAdmin(Mutation):
             return CreateAdmin(user=None, ok=False)
 
 
-# TODO: chain delete references to the object in questions and tours
-
-
 class DeleteMuseumObject(Mutation):
     class Arguments:
         token = String(required=True)
@@ -207,11 +202,39 @@ class DeleteMuseumObject(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, object_id):
-        admin_claim = {'admin': True}
         if get_jwt_claims() == admin_claim:
             if MuseumObjectModel.objects(object_id=object_id):
                 museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+                questions = QuestionModel.objects(contains__linked_objects=museum_object)
+                for question in questions:
+                    linked = question.linked_objects
+                    linked.remove(museum_object)
+                    if not linked:
+                        tours = TourModel.objects(contains__questions=question)
+                        answers = AnswerModel.objects(question=question)
+                        for tour in tours:
+                            for answer in answers:
+                                if answer in tour.answers:
+                                    tour_answers = tour.answers
+                                    tour_answers.remove(answer)
+                                    tour.update(set__answers=tour_answers)
+                                    tour.save()
+                                    answer.delete()
+                            tour_questions = tour.questions
+                            tour_questions.remove(question)
+                            tour.update(set__questions=tour_questions)
+                            tour.save()
+                            question.delete()
+                    else:
+                        question.update(set__linked_objects=linked)
+                tours = TourModel.objects(contains__referenced_objects=museum_object)
+                for tour in tours:
+                    referenced = tour.referenced_objects
+                    referenced.remove(museum_object)
+                    tour.update(set__referenced_objects=referenced)
+                    tour.save()
                 museum_object.delete()
+
                 return DeleteMuseumObject(ok=BooleanField(boolean=True))
             else:
                 return DeleteMuseumObject(ok=BooleanField(boolean=False))
@@ -251,7 +274,6 @@ class Auth(Mutation):
                 AdminModel.objects(username=username)[0].password, password)):
             return Auth(ok=False)
         else:
-            admin_claim = {'admin': True}
             return Auth(access_token=create_access_token(username, user_claims=admin_claim),
                         refresh_token=create_refresh_token(username, user_claims=admin_claim),
                         ok=True)
@@ -268,7 +290,6 @@ class Refresh(Mutation):
     def mutate(cls, info):
         current_user = get_jwt_identity()
         claim = get_jwt_claims()
-        admin_claim = {'admin': True}
         if claim == admin_claim:
             return Refresh(new_token=create_access_token(identity=current_user, user_claims=admin_claim))
         else:
@@ -285,7 +306,6 @@ class CreateCode(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info):
-        admin_claim = {'admin': True}
         if get_jwt_claims() == admin_claim:
             letters = string.ascii_lowercase
             code_string = ''.join(random.choice(letters) for i in range(5))
@@ -307,7 +327,6 @@ class DemoteUser(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, username):
-        admin_claim = {'admin': True}
         if get_jwt_claims() == admin_claim:
             if UserModel.objects(username=username):
                 user = UserModel.objects.get(username=username)
@@ -321,9 +340,6 @@ class DemoteUser(Mutation):
             return DemoteUser(ok=BooleanField(boolean=False), user=None)
 
 
-# TODO: chain delete tours the user owned and remove the user from member lists of tours he participated in
-
-
 class DeleteUser(Mutation):
     class Arguments:
         username = String(required=True)
@@ -334,10 +350,19 @@ class DeleteUser(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, username):
-        admin_claim = {'admin': True}
         if get_jwt_claims() == admin_claim:
             if UserModel.objects(username=username):
                 user = UserModel.objects.get(username=username)
+                tours = TourModel.objects(owner=user)
+                for tour in tours:
+                    for question in tour.questions:
+                        question.delete()
+                    for answer in tour.answers:
+                        answer.delete()
+                    tour.delete()
+                answers = AnswerModel.objects(owner=user)
+                for answer in answers:
+                    answer.delete()
                 user.delete()
                 return DeleteUser(ok=BooleanField(boolean=True))
             else:
@@ -357,7 +382,6 @@ class DenyReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        admin_claim = {'admin': True}
         if get_jwt_claims() == admin_claim:
             if TourModel.objects(id=tour):
                 tour = TourModel.objects.get(id=tour)
@@ -382,7 +406,6 @@ class AcceptReview(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour):
-        admin_claim = {'admin': True}
         if get_jwt_claims() == admin_claim:
             if TourModel.objects(id=tour):
                 tour = TourModel.objects.get(id=tour)
@@ -394,6 +417,28 @@ class AcceptReview(Mutation):
                 return DenyReview(ok=BooleanField(boolean=False), tour=None)
         else:
             return DenyReview(ok=BooleanField(boolean=False), tour=None)
+
+
+class ReadFeedback(Mutation):
+    class Arguments:
+        token = String(required=True)
+        feedback = String(required=True)
+
+    ok = Field(ProtectedBool)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, feedback):
+        if get_jwt_claims() == admin_claim:
+            if not AppFeedbackModel.objects(id=feedback):
+                return ReadFeedback(ok=BooleanField(boolean=False))
+            else:
+                feedback = AppFeedbackModel.objects.get(id=feedback)
+                feedback.update(set__read=True)
+                feedback.save()
+                return ReadFeedback(ok=BooleanField(boolean=True))
+        else:
+            return ReadFeedback(ok=BooleanField(boolean=False))
 
 
 class Mutation(ObjectType):
@@ -409,6 +454,7 @@ class Mutation(ObjectType):
     delete_user = DeleteUser.Field()
     deny_review = DenyReview.Field()
     accept_review = AcceptReview.Field()
+    read_feedback = ReadFeedback.Field()
 
 
 class Query(ObjectType):
@@ -417,6 +463,14 @@ class Query(ObjectType):
     objects = List(MuseumObject, object_id=String())
     pending = List(Tour)
     featured = List(Tour)
+    feedback = List(AppFeedback)
+    unread_feedback = List(AppFeedback)
+
+    def resolve_feedback(self, info):
+        return list(AppFeedbackModel.objects.all())
+
+    def resolve_unread_feedback(self, info):
+        return list(AppFeedbackModel.object(read=False))
 
     def resolve_featured(self, info):
         return list(TourModel.objects(status='featured'))

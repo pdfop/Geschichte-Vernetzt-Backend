@@ -8,6 +8,7 @@ from models.Admin import Admin as AdminModel
 from models.Code import Code as CodeModel
 from models.AppFeedback import AppFeedback as AppFeedbackModel
 from models.TourFeedback import TourFeedback as TourFeedbackModel
+from models.Favourites import Favourites as FavouritesModel
 
 
 class Tour(MongoengineObjectType):
@@ -53,3 +54,8 @@ class AppFeedback(MongoengineObjectType):
 class TourFeedback(MongoengineObjectType):
     class Meta:
         model = TourFeedbackModel
+
+
+class Favourites(MongoengineObjectType):
+    class Meta:
+        model = FavouritesModel

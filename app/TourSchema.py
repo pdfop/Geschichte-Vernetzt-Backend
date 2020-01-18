@@ -7,8 +7,8 @@ from models.Tour import Tour as TourModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.Question import Question as QuestionModel
 from models.Answer import Answer as AnswerModel
-from models.Admin import Admin as AdminModel
-from app.Fields import Tour, User, Question, Answer, TourFeedback, MuseumObject
+from models.TourFeedback import TourFeedback as TourFeedbackModel
+from app.Fields import Tour, Question, Answer, TourFeedback, MuseumObject
 
 
 class CreateTour(Mutation):
@@ -65,9 +65,6 @@ class CreateAnswer(Mutation):
                 return CreateAnswer(answer=prev, ok=BooleanField(boolean=True))
         else:
             return CreateAnswer(answer=None, ok=BooleanField(boolean=False))
-
-
-# TODO: object linking
 
 
 class CreateQuestion(Mutation):
@@ -313,9 +310,6 @@ class RemoveMuseumObject(Mutation):
             return RemoveMuseumObject(tour=None, ok=BooleanField(boolean=False))
 
 
-# TODO: chain delete answers to the question
-
-
 class RemoveQuestion(Mutation):
     class Arguments:
         token = String(required=True)
@@ -337,7 +331,16 @@ class RemoveQuestion(Mutation):
                     questions = tour.questions
                     if question in questions:
                         questions.remove(question)
-                    tour.update(set__questions=question)
+                        question.delete()
+                    tour.update(set__questions=questions)
+                    tour.save()
+                    tour.reload()
+                    answers = tour.answers
+                    for answer in answers:
+                        if answer.question == question:
+                            answers.remove(answer)
+                            answer.delete()
+                            tour.update(set__answers=answers)
                     tour.save()
                     tour.reload()
                     return RemoveQuestion(tour=tour, ok=BooleanField(boolean=True))
@@ -382,6 +385,28 @@ class RemoveUser(Mutation):
             return RemoveUser(tour=None, ok=BooleanField(boolean=False))
 
 
+class SubmitFeedback(Mutation):
+    class Arguments:
+        tour = String(required=True)
+        token = String(required=True)
+        rating = Int(required=True)
+        review = String(required=True)
+
+    ok = Field(ProtectedBool)
+    feedback = Field(TourFeedback)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, rating, tour, review):
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
+            feedback = TourFeedbackModel(rating=rating, review=review, tour=tour)
+            feedback.save()
+            return SubmitFeedback(ok=BooleanField(boolean=True), feedback=feedback)
+        else:
+            return SubmitFeedback(ok=BooleanField(boolean=False), feedback=None)
+
+
 class Mutation(ObjectType):
     create_tour = CreateTour.Field()
     create_question = CreateQuestion.Field()
@@ -395,18 +420,15 @@ class Mutation(ObjectType):
     remove_museum_object = RemoveMuseumObject.Field()
     remove_question = RemoveQuestion.Field()
     remove_user = RemoveUser.Field()
+    submit_feedback = SubmitFeedback.Field()
 
 
 class Query(ObjectType):
+    # queries related to tours
     tour = List(Tour, token=String(), tour=String())
     my_tours = List(Tour, token=String())
-    museum_object = List(MuseumObject, object_id=String())
     owned_tours = List(Tour, token=String())
-
-    def revolve_museum_object(cls, _, info, **kwargs):
-        object_id = kwargs.get('object_id', 1)
-        museum_object = MuseumObjectModel.objects(object_id=object_id)
-        return list(museum_object)
+    feedback = List(TourFeedback, token=String(), tour=String())
 
     @classmethod
     @query_jwt_required
@@ -424,7 +446,7 @@ class Query(ObjectType):
         if user in tour.users:
             return [tour]
         else:
-            return None
+            return []
 
     @classmethod
     @query_jwt_required
@@ -432,6 +454,68 @@ class Query(ObjectType):
         username = get_jwt_identity()
         user = UserModel.objects.get(username=username)
         return list(TourModel.objects(owner=user))
+
+    @classmethod
+    @query_jwt_required
+    def resolve_feedback(cls, _, info, tour):
+        user = UserModel.objects.get(username=get_jwt_identity())
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
+        if tour.owner == user:
+            return list(TourFeedbackModel.objects(tour=tour))
+        else:
+            return []
+
+    # queries related to questions and answers
+    answers_to_question = List(Question, token=String(), question=String())
+    answers_by_user = List(Answer, tour=String(), token=String(), user=String())
+    my_answers = List(Answer, token=String(), tour=String())
+
+    @classmethod
+    @query_jwt_required
+    def resolve_answers_to_question(cls, _, info, question):
+        if QuestionModel.objects(id=question):
+            question = QuestionModel.objects.get(id=question)
+            return list(AnswerModel.objects(question=question))
+        else:
+            return None
+
+    # TODO: when adding public and private answers gate private answers to the tour owner
+
+    @classmethod
+    @query_jwt_required
+    def resolve_answers_by_user(cls, _, info, username, tour):
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            if TourModel.objects(id=tour):
+                tour = TourModel.objects.get(id=tour)
+                answers = []
+                for answer in tour.answers:
+                    if answer.user == user:
+                        answers.append(answer)
+                return answers
+        return None
+
+    @classmethod
+    @query_jwt_required
+    def resolve_my_answers(cls, _, info, tour):
+        if TourModel.objects(id=tour):
+            tour = TourModel.objects.get(id=tour)
+            user = UserModel.objects.get(username=get_jwt_identity())
+            answers = []
+            for answer in tour.answers:
+                if answer.user == user:
+                    answers.append(answer)
+            return answers
+        return None
+
+    # master query for objects
+    museum_object = List(MuseumObject, object_id=String())
+
+    def revolve_museum_object(cls, _, info, **kwargs):
+        object_id = kwargs.get('object_id', 1)
+        museum_object = MuseumObjectModel.objects(object_id=object_id)
+        return list(museum_object)
 
 
 tour_schema = Schema(query=Query, mutation=Mutation)
