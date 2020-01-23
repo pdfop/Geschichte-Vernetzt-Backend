@@ -10,6 +10,10 @@ from models.AppFeedback import AppFeedback as AppFeedbackModel
 from models.TourFeedback import TourFeedback as TourFeedbackModel
 from models.Favourites import Favourites as FavouritesModel
 
+"""
+    This file contains the models used in GraphQL 
+"""
+
 
 class Tour(MongoengineObjectType):
     class Meta:

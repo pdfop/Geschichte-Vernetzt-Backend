@@ -3,7 +3,7 @@ from mongoengine import *
 
 class User(Document):
     """
-        Template for an user object in the Database.
+        Template for a user in the Database.
     """
     meta = {'db_alias': 'user',
             'collection': 'user'}

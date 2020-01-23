@@ -2,9 +2,8 @@ from flask import Blueprint, request
 import json
 from app.UserSchema import user_schema
 """
-Subapp to handle user management. 
-Creates and manages user accounts. Admin accounts managed separately.
-Handles teacher account promotion
+Endpoint for user account creation 
+serves app.UserSchema.user_schema
 """
 
 user = Blueprint('user', __name__, template_folder='models', url_prefix='/user')

@@ -2,8 +2,8 @@ from flask_graphql_auth import AuthInfoField
 from graphene import ObjectType, String, Boolean, Union
 
 """
-collection of protected unions of various data types and jwt-auths's AuthInfoField
-used in the Schemas to implement protected access to data 
+This file is the collection of protected unions of various data types and jwt-auths's AuthInfoField
+These fields are used in the schemas to implement protected access to data. 
 """
 
 

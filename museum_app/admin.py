@@ -3,10 +3,8 @@ from flask import Blueprint, request
 from app.AdminSchema import admin_schema
 
 """
-Subapp to handle admin portal. 
-Creates and manages admin accounts. 
-Creates and manages promotion codes. 
-Contains admin functionality 
+Endpoint for the admin portal. 
+serves app.AdminSchema.admin_schema
 """
 admin = Blueprint('admin', __name__, template_folder="models", url_prefix='/admin')
 

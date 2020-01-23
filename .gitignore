@@ -3,6 +3,6 @@
 
 app/__pycache__/
 
-flaskr/__pycache__/
+museum_app/__pycache__/
 
 models/__pycache__/
