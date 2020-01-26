@@ -11,6 +11,7 @@ admin = Blueprint('admin', __name__, template_folder="models", url_prefix='/admi
 
 @admin.route('/', methods=['POST'])
 def admin_endpoint():
+    """Endpoint Serving the Admin Schema. Accepts POST requests at /admin/ and returns the result in json"""
     data = json.loads(request.data)
     return json.dumps(admin_schema.execute(data['query']).data)
 
