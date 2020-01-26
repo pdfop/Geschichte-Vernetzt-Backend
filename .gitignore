@@ -6,3 +6,5 @@ app/__pycache__/
 museum_app/__pycache__/
 
 models/__pycache__/
+
+server_packages.txt
