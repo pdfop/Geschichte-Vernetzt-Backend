@@ -9,7 +9,6 @@ from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.TourFeedback import TourFeedback as TourFeedbackModel
 from models.Question import Question as QuestionModel
 
-
 """
     These are the queries available to the App API. 
     Included queries: 
@@ -35,20 +34,22 @@ class Query(ObjectType):
     @classmethod
     @query_jwt_required
     def resolve_favourite_tours(cls, _, info):
-        user = UserModel.objects.get(username=get_jwt_identity())
-        if FavouritesModel.objects(user=user):
-            return list(FavouritesModel.objects.get(user=user).favourite_tours)
-        else:
-            return None
+        username = get_jwt_identity()
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            if FavouritesModel.objects(user=user):
+                return list(FavouritesModel.objects.get(user=user).favourite_tours)
+        return None
 
     @classmethod
     @query_jwt_required
     def resolve_favourite_objects(cls, _, info):
-        user = UserModel.objects.get(username=get_jwt_identity())
-        if FavouritesModel.objects(user=user):
-            return list(FavouritesModel.objects.get(user=user).favourite_objects)
-        else:
-            return None
+        username = get_jwt_identity()
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            if FavouritesModel.objects(user=user):
+                return list(FavouritesModel.objects.get(user=user).favourite_objects)
+        return None
 
         # queries related to tours
 
@@ -59,60 +60,66 @@ class Query(ObjectType):
        if unsuccessful because the tour does not exist or the user is not a member of the tour returns Null and False
        if unsuccessful because the toke is invalid returns an empty value for ok
         """
-    tour = List(Tour, token=String(), tour=String())
+    tour = List(Tour, token=String(), tour_id=String())
     """ Returns all tours a user is a Member of."""
     my_tours = List(Tour, token=String())
     """Returns all tours a user has created."""
     owned_tours = List(Tour, token=String())
     """Returns all feedback submitted for a tour. Can only be queried by the Tour owner."""
-    feedback = List(TourFeedback, token=String(), tour=String())
+    feedback = List(TourFeedback, token=String(), tour_id=String())
 
     @classmethod
     @query_jwt_required
     def resolve_my_tours(cls, _, info):
         username = get_jwt_identity()
-        user = UserModel.objects.get(username=username)
-        return list(TourModel.objects(users__contains=user))
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            return list(TourModel.objects(users__contains=user))
+        return []
 
     @classmethod
     @query_jwt_required
-    def resolve_tour(cls, _, info, tour):
+    def resolve_tour(cls, _, info, tour_id):
         username = get_jwt_identity()
-        user = UserModel.objects.get(username=username)
-        tour = TourModel.objects.get(id=tour)
-        if user in tour.users:
-            return [tour]
-        else:
-            return []
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
+                if user in tour.users:
+                    return [tour]
+        return []
 
     @classmethod
     @query_jwt_required
     def resolve_owned_tours(cls, _, info):
         username = get_jwt_identity()
-        user = UserModel.objects.get(username=username)
-        return list(TourModel.objects(owner=user))
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            return list(TourModel.objects(owner=user))
+        return []
 
     @classmethod
     @query_jwt_required
-    def resolve_feedback(cls, _, info, tour):
-        user = UserModel.objects.get(username=get_jwt_identity())
-        if TourModel.objects(id=tour):
-            tour = TourModel.objects.get(id=tour)
-        if tour.owner == user:
-            return list(TourFeedbackModel.objects(tour=tour))
-        else:
-            return []
+    def resolve_feedback(cls, _, info, tour_id):
+        username = get_jwt_identity()
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
+            if tour.owner == user:
+                return list(TourFeedbackModel.objects(tour=tour))
+        return []
 
     # queries related to questions and answers
-    answers_to_question = List(Question, token=String(), question=String())
-    answers_by_user = List(Answer, tour=String(), token=String(), user=String())
-    my_answers = List(Answer, token=String(), tour=String())
+    answers_to_question = List(Question, token=String(), question_id=String())
+    answers_by_user = List(Answer, token=String(), tour_id=String(), user=String())
+    my_answers = List(Answer, token=String(), tour_id=String())
 
     @classmethod
     @query_jwt_required
-    def resolve_answers_to_question(cls, _, info, question):
-        if QuestionModel.objects(id=question):
-            question = QuestionModel.objects.get(id=question)
+    def resolve_answers_to_question(cls, _, info, question_id):
+        if QuestionModel.objects(id=question_id):
+            question = QuestionModel.objects.get(id=question_id)
             return list(AnswerModel.objects(question=question))
         else:
             return None
@@ -121,11 +128,11 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_answers_by_user(cls, _, info, username, tour):
+    def resolve_answers_by_user(cls, _, info, username, tour_id):
         if UserModel.objects(username=username):
             user = UserModel.objects.get(username=username)
-            if TourModel.objects(id=tour):
-                tour = TourModel.objects.get(id=tour)
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
                 answers = []
                 for answer in tour.answers:
                     if answer.user == user:
@@ -135,15 +142,17 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_my_answers(cls, _, info, tour):
-        if TourModel.objects(id=tour):
-            tour = TourModel.objects.get(id=tour)
-            user = UserModel.objects.get(username=get_jwt_identity())
-            answers = []
-            for answer in tour.answers:
-                if answer.user == user:
-                    answers.append(answer)
-            return answers
+    def resolve_my_answers(cls, _, info, tour_id):
+        if TourModel.objects(id=tour_id):
+            tour = TourModel.objects.get(id=tour_id)
+            username = get_jwt_identity()
+            if UserModel.objects(username=username):
+                user = UserModel.objects.get(username=username)
+                answers = []
+                for answer in tour.answers:
+                    if answer.user == user:
+                        answers.append(answer)
+                return answers
         return None
 
     # master query for objects
@@ -164,7 +173,7 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def revolve_museum_object(cls, _, info, **kwargs):
+    def resolve_museum_object(cls, _, info, **kwargs):
         object_id = kwargs.get('object_id', None)
         category = kwargs.get('category', None)
         sub_category = kwargs.get('sub_category', None)
@@ -178,15 +187,32 @@ class Query(ObjectType):
         location = kwargs.get('location', None)
         description = kwargs.get('description', None)
         interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
-        attributes = [object_id, category, sub_category, title, year, picture, art_type, creator, material, size,
-                      location, description, interdisciplinary_context]
-        names = ["object_id", "category", "sub_category", "title", "year", "picture", "art_type", "creator", "material",
-                 "size", "location", "description", "interdisciplinary_context"]
-        qs = {}
-        print("no")
-        for i in range(len(names)):
-            if attributes[i] is not None:
-                print(names[i])
-                qs[names[i]] = attributes[i]
-        museum_object = MuseumObjectModel.objects(__raw__=qs)
-        return list(museum_object)
+        result = MuseumObjectModel.objects.all()
+        if object_id is not None:
+            result = result(object_id=object_id)
+        if category is not None:
+            result = result(category=category)
+        if sub_category is not None:
+            result = result(sub_category)
+        if title is not None:
+            result = result(title=title)
+        if year is not None :
+            result = result(year__contains=year)
+        if picture is not None:
+            result = result(picture__contains=picture)
+        if art_type is not None:
+            result = result(art_type__contains=art_type)
+        if creator is not None:
+            result = result(creator__contains=creator)
+        if material is not None:
+            result = result(material__contains=material)
+        if size is not None:
+            result = result(size=size)
+        if location is not None:
+            result = result(location__contains=location)
+        if description is not None:
+            result = result(description=description)
+        if interdisciplinary_context is not None:
+            result = result(interdisciplinary_context=interdisciplinary_context)
+        return list(result)
+

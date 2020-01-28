@@ -1,37 +1,137 @@
+from flask_graphql_auth import query_jwt_required, get_jwt_claims
 from graphene import ObjectType, List, String, Field, Boolean, Int
-from app.Fields import Tour, MuseumObject, Admin, User, Code, AppFeedback
+from app.Fields import Tour, MuseumObject, Code, AppFeedback, TourFeedback
 from models.AppFeedback import AppFeedback as AppFeedbackModel
 from models.Tour import Tour as TourModel
+from models.Code import Code as CodeModel
+from models.TourFeedback import TourFeedback as TourFeedbackModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
-from models.Admin import Admin as AdminModel
+from app.WebMutations import admin_claim
 
 
 class Query(ObjectType):
-    users = List(Admin)
-    user = List(Admin, username=String())
-    objects = List(MuseumObject, object_id=String())
-    pending = List(Tour)
-    featured = List(Tour)
-    feedback = List(AppFeedback)
-    unread_feedback = List(AppFeedback)
+    pending = List(Tour, token=String())
+    featured = List(Tour, token=String())
+    feedback = List(AppFeedback, token=String())
+    unread_feedback = List(AppFeedback, token=String())
+    codes = List(Code, token=String())
+    tour_feedback = List(TourFeedback, tour_id=String(), token=String())
+    tour = List(Tour, token=String(), tour_id=String())
+    museum_object = List(MuseumObject, object_id=String(),
+                         category=String(),
+                         sub_category=String(),
+                         title=String(),
+                         token=String(required=True),
+                         year=String(),
+                         picture=String(),
+                         art_type=String(),
+                         creator=String(),
+                         material=String(),
+                         size=String(),
+                         location=String(),
+                         description=String(),
+                         interdisciplinary_context=String())
 
-    def resolve_feedback(self, info):
-        return list(AppFeedbackModel.objects.all())
+    @classmethod
+    @query_jwt_required
+    def resolve_codes(cls,info):
+        if get_jwt_claims() == admin_claim:
+            return list(CodeModel.objects.all())
+        else:
+            return []
 
-    def resolve_unread_feedback(self, info):
-        return list(AppFeedbackModel.object(read=False))
+    @classmethod
+    @query_jwt_required
+    def resolve_tour_feedback(cls,info, tour_id):
+        if get_jwt_claims() == admin_claim:
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
+                if TourFeedbackModel.objects(tour=tour):
+                    return list(TourFeedbackModel.objects(tour=tour))
+        return []
 
-    def resolve_featured(self, info):
-        return list(TourModel.objects(status='featured'))
+    @classmethod
+    @query_jwt_required
+    def resolve_feedback(cls, info):
+        if get_jwt_claims() == admin_claim:
+            return list(AppFeedbackModel.objects.all())
+        else:
+            return []
 
-    def resolve_pending(self, info):
-        return list(TourModel.objects(status='pending'))
+    @classmethod
+    @query_jwt_required
+    def resolve_unread_feedback(cls, info):
+        if get_jwt_claims() == admin_claim:
+            return list(AppFeedbackModel.object(read=False))
+        else:
+            return []
 
-    def resolve_objects(self, info, object_id):
-        return MuseumObjectModel.objects(object_id=object_id)
+    @classmethod
+    @query_jwt_required
+    def resolve_featured(cls, info):
+        if get_jwt_claims() == admin_claim:
+            return list(TourModel.objects(status='featured'))
+        else:
+            return []
 
-    def resolve_user(self, info, username):
-        return list(AdminModel.objects(username=username))
+    @classmethod
+    @query_jwt_required
+    def resolve_pending(cls, info):
+        if get_jwt_claims() == admin_claim:
+            return list(TourModel.objects(status='pending'))
+        else:
+            return []
 
-    def resolve_users(self, info):
-        return list(AdminModel.objects.all())
+    @classmethod
+    @query_jwt_required
+    def resolve_tour(cls, info, tour_id):
+        if get_jwt_claims() == admin_claim:
+            if TourModel.objects(id=tour_id):
+                return list(TourModel.objects.get(id=tour_id))
+        return []
+
+    @classmethod
+    @query_jwt_required
+    def resolve_museum_object(cls, _, info, **kwargs):
+        object_id = kwargs.get('object_id', None)
+        category = kwargs.get('category', None)
+        sub_category = kwargs.get('sub_category', None)
+        title = kwargs.get('title', None)
+        year = kwargs.get('year', None)
+        picture = kwargs.get('picture', None)
+        art_type = kwargs.get('art_type', None)
+        creator = kwargs.get('creator', None)
+        material = kwargs.get('material', None)
+        size = kwargs.get('size', None)
+        location = kwargs.get('location', None)
+        description = kwargs.get('description', None)
+        interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
+        result = MuseumObjectModel.objects.all()
+        if object_id is not None:
+            result = result(object_id=object_id)
+        if category is not None:
+            result = result(category=category)
+        if sub_category is not None:
+            result = result(sub_category)
+        if title is not None:
+            result = result(title=title)
+        if year is not None :
+            result = result(year__contains=year)
+        if picture is not None:
+            result = result(picture__contains=picture)
+        if art_type is not None:
+            result = result(art_type__contains=art_type)
+        if creator is not None:
+            result = result(creator__contains=creator)
+        if material is not None:
+            result = result(material__contains=material)
+        if size is not None:
+            result = result(size=size)
+        if location is not None:
+            result = result(location__contains=location)
+        if description is not None:
+            result = result(description=description)
+        if interdisciplinary_context is not None:
+            result = result(interdisciplinary_context=interdisciplinary_context)
+        return list(result)
+

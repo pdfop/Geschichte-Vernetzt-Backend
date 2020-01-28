@@ -31,6 +31,8 @@ most other methods require a valid token
 
 """
 
+# a user claim that is inserted into the claims of admin access tokens upon creation.
+# mutations in this Schema validate that the token includes this claim to ensure functions are only called by admins
 admin_claim = {'admin': True}
 
 
