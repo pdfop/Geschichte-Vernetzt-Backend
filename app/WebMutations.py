@@ -37,6 +37,24 @@ admin_claim = {'admin': True}
 
 
 class CreateMuseumObject(Mutation):
+    """ Create a Museum Object.
+        Parameters: token, String, required, valid jwt access token with the admin claim
+                    objectId, String, required, inventory id of the object in the museum
+                    category, String, required, category of the object in the museum. 'Abteilung'
+                    subCategory, String, required, sub-category of the object in the museum. 'Sammlungsbereich'
+                    title, String, required, name of the object
+                    year, List of Strings, optional, year the object was created/found
+                    picture, List of Urls,optional, pictures of the object
+                    art_type, List of Strings, optional, classification of the object e.g. 'painting'
+                    creator, List of Strings, optional, creators of the object
+                    material, List of Strings, optional, materials the object is made of
+                    size, String, optional, size of the object by heightxwidthxdepth in centimeters
+                    location, List of Strings, optional, locations the object was made/found at
+                    description, String, optional, description of the object
+                    interdisciplinary_context, String, optional, interdisciplinary relations of the object
+        returns the object and True if successful
+        returns Null and False if token did not belong to admin or object with that id already existed
+        returns Null and an empty value for ok if token was invalid """
     class Arguments:
         object_id = String(required=True)
         category = String(required=True)
@@ -87,6 +105,24 @@ class CreateMuseumObject(Mutation):
 
 
 class UpdateMuseumObject(Mutation):
+    """ Modify a Museum Object.
+        Parameters: token, String, required, valid jwt access token with the admin claim
+                    objectId, String, required, inventory id of the object in the museum
+                    category, String, optional, category of the object in the museum. 'Abteilung'
+                    subCategory, String, optional, sub-category of the object in the museum. 'Sammlungsbereich'
+                    title, String, optional, name of the object
+                    year, List of Strings, optional, year the object was created/found
+                    picture, List of Urls,optional, pictures of the object
+                    art_type, List of Strings, optional, classification of the object e.g. 'painting'
+                    creator, List of Strings, optional, creators of the object
+                    material, List of Strings, optional, materials the object is made of
+                    size, String, optional, size of the object by heightxwidthxdepth in centimeters
+                    location, List of Strings, optional, locations the object was made/found at
+                    description, String, optional, description of the object
+                    interdisciplinary_context, String, optional, interdisciplinary relations of the object
+        returns the updated object and True if successful
+        returns Null and False if token did not belong to admin or object with that id does not exist
+        returns Null and an empty value for ok if token was invalid """
     class Arguments:
         object_id = String(required=True)
         token = String(required=True)
@@ -183,6 +219,12 @@ class UpdateMuseumObject(Mutation):
 
 
 class CreateAdmin(Mutation):
+    """Create a user account.
+           Parameters: username, String, name of the account. has to be unique
+                       password, String, password, no requirements, saved as a hash
+           if successful returns the created user and ok=True
+           fails if the username is already taken. returns Null and False in that case
+    """
     class Arguments:
         username = String(required=True)
         password = String(required=True)
@@ -198,8 +240,19 @@ class CreateAdmin(Mutation):
         else:
             return CreateAdmin(user=None, ok=False)
 
+# TODO: add removal from user favourites
+
 
 class DeleteMuseumObject(Mutation):
+    """Delete a Museum Object.
+       Parameters: token, String, valid jwt access token with the admin claim
+                   objectId, String, museum inventory id of the object to be deleted
+        returns True if successful
+        returns false if token does not have admin claim
+        returns empty value if token was invalid
+        is successful if object does not exist
+        deletes all references to the object in favourites, tours, questions
+         """
     class Arguments:
         token = String(required=True)
         object_id = String(required=True)
@@ -242,14 +295,20 @@ class DeleteMuseumObject(Mutation):
                     tour.save()
                 museum_object.delete()
 
-                return DeleteMuseumObject(ok=BooleanField(boolean=True))
-            else:
-                return DeleteMuseumObject(ok=BooleanField(boolean=False))
+            return DeleteMuseumObject(ok=BooleanField(boolean=True))
+
         else:
             return DeleteMuseumObject(ok=BooleanField(boolean=False))
 
 
 class ChangePassword(Mutation):
+    """Change a user's password.
+       Requires the user to be logged in.
+       Parameters: token, String, valid jwt access token of a user
+                   password, String, the NEW password
+       if successful returns True
+       if unsuccessful because the token is invalid returns an empty value
+    """
     class Arguments:
         token = String()
         password = String()
@@ -267,6 +326,12 @@ class ChangePassword(Mutation):
 
 
 class Auth(Mutation):
+    """Login. Create a session and jwt access and refresh tokens.
+       Parameters: username, String, the username of the account you wish to log in to
+                   password, String, the password of the account. password is hashed and compared to the saved hash.
+        if successful returns a jwt accessToken (String), a jwt refresh token (String) and True
+            inserts the admin claim to the token's user claims
+        if unsuccessful because the user does not exist or the password was invalid returns Null Null and False"""
     class Arguments:
         username = String(required=True)
         password = String(required=True)
@@ -287,6 +352,11 @@ class Auth(Mutation):
 
 
 class Refresh(Mutation):
+    """Refresh a user's access token.
+       Parameter: refreshToken, String, valid jwt refresh token.
+       if successful return a new jwt access token for the owner of the refresh token. this invalidates old access tokens.
+       if unsuccessful because the refresh token was invalid returns Null
+    """
     class Arguments(object):
         refresh_token = String()
 
@@ -304,6 +374,12 @@ class Refresh(Mutation):
 
 
 class CreateCode(Mutation):
+    """Create an account promotion code.
+       Parameter: token, String, valid jwt access token with the admin claim
+       returns a code and True if successful
+       returns Null and false if token does not have admin claim
+       returns Null and empty value for ok if token is invalid
+       the created code is a random 5-character string """
     class Arguments:
         token = String(required=True)
 
@@ -324,6 +400,13 @@ class CreateCode(Mutation):
 
 
 class DemoteUser(Mutation):
+    """Remove a user's producer status.
+       Parameter: token, String, valid jwt access token with the admin claim
+                  username, String, name of the user you want to demote
+        returns the updated user object and True if successful
+        returns Null and False if the user did not exist or the token does not have the admin claim
+        returns Null and an empty value for ok if the token was invalid
+    """
     class Arguments:
         username = String(required=True)
         token = String(required=True)
@@ -346,8 +429,19 @@ class DemoteUser(Mutation):
         else:
             return DemoteUser(ok=BooleanField(boolean=False), user=None)
 
+# TODO: delete favourites alongside
+
 
 class DeleteUser(Mutation):
+    """Delete a user account
+       Parameters: token, String, valid jwt access token with the admin claim
+                   username, String, name of the account you want to delete
+        returns True if successful
+        returns False if token does not have the admin claim
+        returns empty value if token was invalid
+        successful if the user does not exist
+        deletes all answers, tours, questions and favourites of the user
+    """
     class Arguments:
         username = String(required=True)
         token = String(required=True)
@@ -371,27 +465,34 @@ class DeleteUser(Mutation):
                 for answer in answers:
                     answer.delete()
                 user.delete()
-                return DeleteUser(ok=BooleanField(boolean=True))
-            else:
-                return DeleteUser(ok=BooleanField(boolean=False))
+            return DeleteUser(ok=BooleanField(boolean=True))
+
         else:
             return DeleteUser(ok=BooleanField(boolean=False))
 
 
 class DenyReview(Mutation):
+    """  Deny a tour that has been submitted for review.
+         Parameters: token, String, valid jwt access token with the admin claim
+                     tourId, String, document id of the tour
+         returns the updated tour object and True if successful
+         returns Null and False if tour does not exist or token does not have admin claim
+         returns Null and empty value if token was invalid
+         sets the tours status field back to private
+    """
     class Arguments:
         token = String(required=True)
-        tour = String(required=True)
+        tour_id = String(required=True)
 
     ok = Field(ProtectedBool)
     tour = Field(Tour)
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, tour):
+    def mutate(cls, _, info, tour_id):
         if get_jwt_claims() == admin_claim:
-            if TourModel.objects(id=tour):
-                tour = TourModel.objects.get(id=tour)
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
                 tour.update(set__status='private')
                 tour.save()
                 tour.reload()
@@ -403,19 +504,27 @@ class DenyReview(Mutation):
 
 
 class AcceptReview(Mutation):
+    """  Accept a tour that has been submitted for review.
+         Parameters: token, String, valid jwt access token with the admin claim
+                     tourId, String, document id of the tour
+         returns the updated tour object and True if successful
+         returns Null and False if tour does not exist or token does not have admin claim
+         returns Null and empty value if token was invalid
+         sets the tours status field back to featured
+    """
     class Arguments:
         token = String(required=True)
         tour = String(required=True)
 
     ok = Field(ProtectedBool)
-    tour = Field(Tour)
+    tour_id = Field(Tour)
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, tour):
+    def mutate(cls, _, info, tour_id):
         if get_jwt_claims() == admin_claim:
-            if TourModel.objects(id=tour):
-                tour = TourModel.objects.get(id=tour)
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
                 tour.update(set__status='featured')
                 tour.save()
                 tour.reload()
@@ -427,6 +536,14 @@ class AcceptReview(Mutation):
 
 
 class ReadFeedback(Mutation):
+    """Read App Feedback.
+       Parameter: token, String, valid jwt access token with the admin claim
+                  feedback, String, object id of the feedback to be read
+        returns True if successful
+        returns False if token does not have admin claim or feedback object does not exist
+        returns empty value if token was invalid
+        sets the feedback's read field to True
+        works on feedback that has already been read """
     class Arguments:
         token = String(required=True)
         feedback = String(required=True)
