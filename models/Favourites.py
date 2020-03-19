@@ -14,7 +14,7 @@ class Favourites(Document):
     meta = {'db_alias': 'user',
             'collection': 'favourites'}
     user = ReferenceField(document_type=User, reverse_delete_rule=CASCADE, primary_key=True, required=True)
-    favourite_tours = ListField(ReferenceField(document_type=Tour, reverse_delete_rule=CASCADE))
-    favourite_objects = ListField(ReferenceField(document_type=MuseumObject, reverse_delete_rule=CASCADE))
+    favourite_tours = ListField(ReferenceField(document_type=Tour, reverse_delete_rule=PULL))
+    favourite_objects = ListField(ReferenceField(document_type=MuseumObject, reverse_delete_rule=PULL))
 
 

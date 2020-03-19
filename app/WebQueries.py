@@ -1,11 +1,12 @@
 from flask_graphql_auth import query_jwt_required, get_jwt_claims
 from graphene import ObjectType, List, String, Field, Boolean, Int
-from app.Fields import Tour, MuseumObject, Code, AppFeedback, TourFeedback
+from app.Fields import Tour, MuseumObject, Code, AppFeedback, TourFeedback, Checkpoint, CheckpointUnion
 from models.AppFeedback import AppFeedback as AppFeedbackModel
 from models.Tour import Tour as TourModel
 from models.Code import Code as CodeModel
 from models.TourFeedback import TourFeedback as TourFeedbackModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
+from models.Checkpoint import Checkpoint as CheckpointModel
 from app.WebMutations import admin_claim
 
 
@@ -17,13 +18,14 @@ class Query(ObjectType):
     codes = List(Code, token=String())
     tour_feedback = List(TourFeedback, tour_id=String(), token=String())
     tour = List(Tour, token=String(), tour_id=String())
+    checkpoint = List(CheckpointUnion, token=String(), checkpoint_id=String())
+    checkpoints_by_tour = List(CheckpointUnion, token=String(), tour_id=String())
     museum_object = List(MuseumObject, object_id=String(),
                          category=String(),
                          sub_category=String(),
                          title=String(),
                          token=String(required=True),
                          year=String(),
-                         picture=String(),
                          art_type=String(),
                          creator=String(),
                          material=String(),
@@ -34,7 +36,7 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_codes(cls,info):
+    def resolve_codes(cls, _, info):
         if get_jwt_claims() == admin_claim:
             return list(CodeModel.objects.all())
         else:
@@ -42,7 +44,7 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_tour_feedback(cls,info, tour_id):
+    def resolve_tour_feedback(cls, _, info, tour_id):
         if get_jwt_claims() == admin_claim:
             if TourModel.objects(id=tour_id):
                 tour = TourModel.objects.get(id=tour_id)
@@ -52,7 +54,7 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_feedback(cls, info):
+    def resolve_feedback(cls, _, info):
         if get_jwt_claims() == admin_claim:
             return list(AppFeedbackModel.objects.all())
         else:
@@ -60,15 +62,15 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_unread_feedback(cls, info):
+    def resolve_unread_feedback(cls, _, info):
         if get_jwt_claims() == admin_claim:
-            return list(AppFeedbackModel.object(read=False))
+            return list(AppFeedbackModel.objects(read=False))
         else:
             return []
 
     @classmethod
     @query_jwt_required
-    def resolve_featured(cls, info):
+    def resolve_featured(cls, _, info):
         if get_jwt_claims() == admin_claim:
             return list(TourModel.objects(status='featured'))
         else:
@@ -76,7 +78,7 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_pending(cls, info):
+    def resolve_pending(cls, _, info):
         if get_jwt_claims() == admin_claim:
             return list(TourModel.objects(status='pending'))
         else:
@@ -84,10 +86,10 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_tour(cls, info, tour_id):
+    def resolve_tour(cls, _, info, tour_id):
         if get_jwt_claims() == admin_claim:
             if TourModel.objects(id=tour_id):
-                return list(TourModel.objects.get(id=tour_id))
+                return list(TourModel.objects(id=tour_id))
         return []
 
     @classmethod
@@ -98,7 +100,6 @@ class Query(ObjectType):
         sub_category = kwargs.get('sub_category', None)
         title = kwargs.get('title', None)
         year = kwargs.get('year', None)
-        picture = kwargs.get('picture', None)
         art_type = kwargs.get('art_type', None)
         creator = kwargs.get('creator', None)
         material = kwargs.get('material', None)
@@ -112,13 +113,11 @@ class Query(ObjectType):
         if category is not None:
             result = result(category=category)
         if sub_category is not None:
-            result = result(sub_category)
+            result = result(sub_category=sub_category)
         if title is not None:
             result = result(title=title)
-        if year is not None :
+        if year is not None:
             result = result(year__contains=year)
-        if picture is not None:
-            result = result(picture__contains=picture)
         if art_type is not None:
             result = result(art_type__contains=art_type)
         if creator is not None:
@@ -135,3 +134,20 @@ class Query(ObjectType):
             result = result(interdisciplinary_context=interdisciplinary_context)
         return list(result)
 
+    @classmethod
+    @query_jwt_required
+    def resolve_checkpoint(cls, _,  info, checkpoint_id):
+        if get_jwt_claims() == admin_claim:
+            if CheckpointModel.objects(id=checkpoint_id):
+                return list(CheckpointModel.objects(id=checkpoint_id))
+        return []
+
+    @classmethod
+    @query_jwt_required
+    def resolve_checkpoints_by_tour(cls, _, info, tour_id):
+        if get_jwt_claims() == admin_claim:
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
+                if CheckpointModel.objects(tour=tour):
+                    return list(CheckpointModel.objects(tour=tour))
+        return []

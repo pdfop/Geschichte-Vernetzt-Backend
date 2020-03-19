@@ -1,4 +1,5 @@
 from mongoengine import *
+from models.Picture import Picture
 
 
 class MuseumObject(Document):
@@ -11,16 +12,16 @@ class MuseumObject(Document):
     meta = {'db_alias': 'object',
             'collection': 'object'}
     title = StringField(required=True)
+    time_range = StringField()
     year = ListField(StringField())
-    # TODO: change this to URL field after testing
-    picture = ListField(StringField())
+    picture = ListField(ReferenceField(document_type=Picture, reverse_delete_rule=PULL))
     art_type = ListField(StringField())
     creator = ListField(StringField())
     material = ListField(StringField())
-    # size is defined as "height x width x depth" in cm
-    size = StringField()
+    size = DictField(default={'height': 0, 'width': 0, 'length': 0, 'diameter': 0})
     location = ListField(StringField())
     description = StringField()
-    interdisciplinary_context = StringField()
+    additional_information = StringField()
+    interdisciplinary_context = ListField(StringField())
 
 

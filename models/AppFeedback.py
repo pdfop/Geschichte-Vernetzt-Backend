@@ -7,6 +7,6 @@ class AppFeedback(Document):
     """
     meta = {'db_alias': 'feedback',
             'collection': 'feedback'}
-    rating = IntField(required=True)
+    rating = IntField(required=True, min_value=1, max_value=5)
     review = StringField(required=True)
     read = BooleanField(default=False)

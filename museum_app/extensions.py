@@ -6,4 +6,4 @@ register_connection("user", "user")
 register_connection("object", "object")
 register_connection("tour", "tour")
 register_connection("feedback", "feedback")
-
+register_connection("file", "file")

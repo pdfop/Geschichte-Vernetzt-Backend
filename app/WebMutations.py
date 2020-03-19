@@ -10,10 +10,21 @@ from models.Tour import Tour as TourModel
 from models.Question import Question as QuestionModel
 from models.AppFeedback import AppFeedback as AppFeedbackModel
 from models.Answer import Answer as AnswerModel
+from models.Favourites import Favourites as FavouritesModel
+from models.Badge import Badge as BadgeModel
+from models.Picture import Picture as PictureModel
+from models.ProfilePicture import ProfilePicture as ProfilePictureModel
+from models.Checkpoint import Checkpoint as CheckpointModel
+from models.PictureCheckpoint import PictureCheckpoint as PictureCheckpointModel
+from models.ObjectCheckpoint import ObjectCheckpoint as ObjectCheckpointModel
+from models.MultipleChoiceQuestion import MultipleChoiceQuestion as MCQuestionModel
+from models.MultipleChoiceAnswer import MultipleChoiceAnswer as MCAnswerModel
+from graphene_file_upload.scalars import Upload
 import string
 import random
 from app.ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
-from app.Fields import Tour, MuseumObject, Admin, User, Code, AppFeedback
+from app.Fields import Tour, MuseumObject, Admin, User, Picture, Badge, Checkpoint, PictureCheckpoint, \
+    ObjectCheckpoint, Question, MCAnswer, Answer, MCQuestion, CheckpointUnion
 
 """
 These are the mutations available in the web portal 
@@ -44,32 +55,42 @@ class CreateMuseumObject(Mutation):
                     subCategory, String, required, sub-category of the object in the museum. 'Sammlungsbereich'
                     title, String, required, name of the object
                     year, List of Strings, optional, year the object was created/found
-                    picture, List of Urls,optional, pictures of the object
+                    picture, List of Upload, optional,  images in png format
                     art_type, List of Strings, optional, classification of the object e.g. 'painting'
                     creator, List of Strings, optional, creators of the object
                     material, List of Strings, optional, materials the object is made of
-                    size, String, optional, size of the object by heightxwidthxdepth in centimeters
-                    location, List of Strings, optional, locations the object was made/found at
+                    width, Int, optional, width of the object in centimeters
+                    height, Int, optional, height of the object in centimeters
+                    length, Int, optional, length of the object in centimeters
+                    diameter, optional, Int, diameter of the object in centimeters
+                    location, optional, List of Strings, optional, locations the object was made/found at
                     description, String, optional, description of the object
-                    interdisciplinary_context, String, optional, interdisciplinary relations of the object
+                    additionalInformation, String, optional, any additional information about the object
+                    interdisciplinary_context, List of String, optional, interdisciplinary relations of the object
         returns the object and True if successful
         returns Null and False if token did not belong to admin or object with that id already existed
         returns Null and an empty value for ok if token was invalid """
+
     class Arguments:
         object_id = String(required=True)
         category = String(required=True)
         sub_category = String(required=True)
         title = String(required=True)
         token = String(required=True)
+        time_range = String()
         year = List(String)
-        picture = List(String)
+        picture = List(Upload)
         art_type = List(String)
         creator = List(String)
         material = List(String)
-        size = String()
+        width = Int()
+        height = Int()
+        length = Int()
+        diameter = Int()
         location = List(String)
         description = String()
-        interdisciplinary_context = String()
+        additional_information = String()
+        interdisciplinary_context = List(String)
 
     museum_object = Field(lambda: MuseumObject)
     ok = ProtectedBool()
@@ -79,22 +100,37 @@ class CreateMuseumObject(Mutation):
     def mutate(cls, _, info, object_id, category, sub_category, title, **kwargs):
         year = kwargs.get('year', None)
         picture = kwargs.get('picture', None)
+        time_range = kwargs.get('time_range', None)
         art_type = kwargs.get('art_type', None)
         creator = kwargs.get('creator', None)
         material = kwargs.get('material', None)
-        size = kwargs.get('size', None)
+        length = kwargs.get('length', None)
+        height = kwargs.get('height', None)
+        width = kwargs.get('width', None)
+        diameter = kwargs.get('diameter', None)
         location = kwargs.get('location', None)
         description = kwargs.get('description', None)
+        additional_information = kwargs.get('additional_information', None)
         interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
 
         if get_jwt_claims() == admin_claim:
 
             if not MuseumObjectModel.objects(object_id=object_id):
+                size = dict(length=length, height=height, width=width, diameter=diameter)
                 museum_object = MuseumObjectModel(object_id=object_id, category=category, sub_category=sub_category,
-                                                  title=title, year=year, picture=picture, art_type=art_type,
-                                                  creator=creator, material=material, size=size, location=location,
-                                                  description=description,
+                                                  title=title, time_range=time_range, year=year,
+                                                  art_type=art_type, creator=creator, material=material,
+                                                  size=size, location=location, description=description,
+                                                  additional_information=additional_information,
                                                   interdisciplinary_context=interdisciplinary_context)
+                if picture is not None:
+                    pics = []
+                    for pic in picture:
+                        x = PictureModel()
+                        x.picture.put(pic, content_type='image/png')
+                        x.save()
+                        pics.append(x)
+                    museum_object.update(set__picture=pics)
                 museum_object.save()
                 return CreateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
 
@@ -112,32 +148,41 @@ class UpdateMuseumObject(Mutation):
                     subCategory, String, optional, sub-category of the object in the museum. 'Sammlungsbereich'
                     title, String, optional, name of the object
                     year, List of Strings, optional, year the object was created/found
-                    picture, List of Urls,optional, pictures of the object
+                    picture, List of Upload, optional, pictures in png format
                     art_type, List of Strings, optional, classification of the object e.g. 'painting'
                     creator, List of Strings, optional, creators of the object
                     material, List of Strings, optional, materials the object is made of
-                    size, String, optional, size of the object by heightxwidthxdepth in centimeters
-                    location, List of Strings, optional, locations the object was made/found at
-                    description, String, optional, description of the object
+                    width, Int, optional, width of the object in centimeters
+                    height, Int, optional, height of the object in centimeters
+                    length, Int, length of the object in centimeters
+                    diameter, optional, Int, diameter of the object in centimeters
+                    location, optional, List of Strings, optional, locations the object was made/found at
+                    description, optional, String, optional, description of the object
                     interdisciplinary_context, String, optional, interdisciplinary relations of the object
         returns the updated object and True if successful
         returns Null and False if token did not belong to admin or object with that id does not exist
         returns Null and an empty value for ok if token was invalid """
+
     class Arguments:
         object_id = String(required=True)
         token = String(required=True)
         category = String()
         sub_category = String()
+        time_range = String()
         title = String()
-        year = String()
-        picture = List(String)
+        year = List(String)
+        picture = List(Upload)
         art_type = List(String)
         creator = List(String)
         material = List(String)
-        size = String()
+        width = Int()
+        height = Int()
+        length = Int()
+        diameter = Int()
         location = List(String)
+        additional_information = String()
         description = String()
-        interdisciplinary_context = String()
+        interdisciplinary_context = List(String)
 
     museum_object = Field(lambda: MuseumObject)
     ok = ProtectedBool()
@@ -149,69 +194,68 @@ class UpdateMuseumObject(Mutation):
             if not MuseumObjectModel.objects(object_id=object_id):
                 return UpdateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
             else:
-                museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-
+                museum_object = MuseumObjectModel.objects.get(object_id=object_id)
                 category = kwargs.get('category', None)
                 sub_category = kwargs.get('sub_category', None)
                 title = kwargs.get('title', None)
+                time_range = kwargs.get('time_range', None)
                 year = kwargs.get('year', None)
                 picture = kwargs.get('picture', None)
                 art_type = kwargs.get('art_type', None)
                 creator = kwargs.get('creator', None)
                 material = kwargs.get('material', None)
-                size = kwargs.get('size', None)
+                length = kwargs.get('length', None)
+                height = kwargs.get('height', None)
+                width = kwargs.get('width', None)
+                diameter = kwargs.get('diameter', None)
                 location = kwargs.get('location', None)
                 description = kwargs.get('description', None)
+                additional_information = kwargs.get('additional_information', None)
                 interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
 
                 if category is not None:
                     museum_object.update(set__category=category)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
                 if sub_category is not None:
                     museum_object.update(set__sub_category=sub_category)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
                 if title is not None:
                     museum_object.update(set__title=title)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
                 if year is not None:
                     museum_object.update(set__year=year)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
                 if picture is not None:
-                    museum_object.update(set__picture=picture)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                    pics = []
+                    for pic in picture:
+                        x = PictureModel()
+                        x.picture.put(pic, content_type='image/png')
+                        x.save()
+                        pics.append(x)
+                    museum_object.update(set__picture=pics)
                 if art_type is not None:
                     museum_object.update(set__art_type=art_type)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if time_range is not None:
+                    museum_object.update(set__time_range=time_range)
+                if additional_information is not None:
+                    museum_object.update(set__additional_information=additional_information)
                 if creator is not None:
                     museum_object.update(set__creator=creator)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
                 if material is not None:
                     museum_object.update(set__material=material)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
-                if size is not None:
-                    museum_object.update(set__size=size)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                if museum_object.size is not None:
+                    if width is not None:
+                        museum_object.update(set__size__width=width)
+                    if length is not None:
+                        museum_object.update(set__size__length=length)
+                    if height is not None:
+                        museum_object.update(set__size__height=height)
+                    if diameter is not None:
+                        museum_object.update(set__size__diameter=diameter)
                 if location is not None:
                     museum_object.update(set__location=location)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
                 if description is not None:
                     museum_object.update(set__description=description)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
                 if interdisciplinary_context is not None:
                     museum_object.update(set__interdisciplinary_context=interdisciplinary_context)
-                    museum_object.save()
-                    museum_object = MuseumObjectModel.objects(object_id=object_id)[0]
+                museum_object.save()
+                museum_object.reload()
 
                 return UpdateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
         else:
@@ -225,6 +269,7 @@ class CreateAdmin(Mutation):
            if successful returns the created user and ok=True
            fails if the username is already taken. returns Null and False in that case
     """
+
     class Arguments:
         username = String(required=True)
         password = String(required=True)
@@ -240,8 +285,6 @@ class CreateAdmin(Mutation):
         else:
             return CreateAdmin(user=None, ok=False)
 
-# TODO: add removal from user favourites
-
 
 class DeleteMuseumObject(Mutation):
     """Delete a Museum Object.
@@ -253,6 +296,7 @@ class DeleteMuseumObject(Mutation):
         is successful if object does not exist
         deletes all references to the object in favourites, tours, questions
          """
+
     class Arguments:
         token = String(required=True)
         object_id = String(required=True)
@@ -265,36 +309,24 @@ class DeleteMuseumObject(Mutation):
         if get_jwt_claims() == admin_claim:
             if MuseumObjectModel.objects(object_id=object_id):
                 museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+                pictures = museum_object.picture
+                for picture in pictures:
+                    picture.delete()
+                favourites = FavouritesModel.objects(contains__favouvite_objects=museum_object)
+                for favourite in favourites:
+                    objects = favourite.favourite_objects
+                    objects.remove(museum_object)
+                    favourite.update(set__favourite_objects=objects)
+                    favourite.save()
                 questions = QuestionModel.objects(contains__linked_objects=museum_object)
                 for question in questions:
                     linked = question.linked_objects
                     linked.remove(museum_object)
-                    if not linked:
-                        tours = TourModel.objects(contains__questions=question)
-                        answers = AnswerModel.objects(question=question)
-                        for tour in tours:
-                            for answer in answers:
-                                if answer in tour.answers:
-                                    tour_answers = tour.answers
-                                    tour_answers.remove(answer)
-                                    tour.update(set__answers=tour_answers)
-                                    tour.save()
-                                    answer.delete()
-                            tour_questions = tour.questions
-                            tour_questions.remove(question)
-                            tour.update(set__questions=tour_questions)
-                            tour.save()
-                            question.delete()
-                    else:
-                        question.update(set__linked_objects=linked)
-                tours = TourModel.objects(contains__referenced_objects=museum_object)
-                for tour in tours:
-                    referenced = tour.referenced_objects
-                    referenced.remove(museum_object)
-                    tour.update(set__referenced_objects=referenced)
-                    tour.save()
+                    question.update(set__linked_objects=linked)
+                checkpoints = ObjectCheckpointModel.objects(museum_object=museum_object)
+                for checkpoint in checkpoints:
+                    checkpoint.delete()
                 museum_object.delete()
-
             return DeleteMuseumObject(ok=BooleanField(boolean=True))
 
         else:
@@ -309,6 +341,7 @@ class ChangePassword(Mutation):
        if successful returns True
        if unsuccessful because the token is invalid returns an empty value
     """
+
     class Arguments:
         token = String()
         password = String()
@@ -332,6 +365,7 @@ class Auth(Mutation):
         if successful returns a jwt accessToken (String), a jwt refresh token (String) and True
             inserts the admin claim to the token's user claims
         if unsuccessful because the user does not exist or the password was invalid returns Null Null and False"""
+
     class Arguments:
         username = String(required=True)
         password = String(required=True)
@@ -357,6 +391,7 @@ class Refresh(Mutation):
        if successful return a new jwt access token for the owner of the refresh token. this invalidates old access tokens.
        if unsuccessful because the refresh token was invalid returns Null
     """
+
     class Arguments(object):
         refresh_token = String()
 
@@ -380,6 +415,7 @@ class CreateCode(Mutation):
        returns Null and false if token does not have admin claim
        returns Null and empty value for ok if token is invalid
        the created code is a random 5-character string """
+
     class Arguments:
         token = String(required=True)
 
@@ -407,6 +443,7 @@ class DemoteUser(Mutation):
         returns Null and False if the user did not exist or the token does not have the admin claim
         returns Null and an empty value for ok if the token was invalid
     """
+
     class Arguments:
         username = String(required=True)
         token = String(required=True)
@@ -429,8 +466,6 @@ class DemoteUser(Mutation):
         else:
             return DemoteUser(ok=BooleanField(boolean=False), user=None)
 
-# TODO: delete favourites alongside
-
 
 class DeleteUser(Mutation):
     """Delete a user account
@@ -442,6 +477,7 @@ class DeleteUser(Mutation):
         successful if the user does not exist
         deletes all answers, tours, questions and favourites of the user
     """
+
     class Arguments:
         username = String(required=True)
         token = String(required=True)
@@ -480,6 +516,7 @@ class DenyReview(Mutation):
          returns Null and empty value if token was invalid
          sets the tours status field back to private
     """
+
     class Arguments:
         token = String(required=True)
         tour_id = String(required=True)
@@ -512,6 +549,7 @@ class AcceptReview(Mutation):
          returns Null and empty value if token was invalid
          sets the tours status field back to featured
     """
+
     class Arguments:
         token = String(required=True)
         tour = String(required=True)
@@ -544,6 +582,7 @@ class ReadFeedback(Mutation):
         returns empty value if token was invalid
         sets the feedback's read field to True
         works on feedback that has already been read """
+
     class Arguments:
         token = String(required=True)
         feedback = String(required=True)
@@ -565,6 +604,210 @@ class ReadFeedback(Mutation):
             return ReadFeedback(ok=BooleanField(boolean=False))
 
 
+class CreateBadge(Mutation):
+    """
+        Create a new Badge that Users can earn.
+        Parameters:
+                token, String, valid jwt access token of an admin
+                name, String, name of the badge
+                badge_id, String, unique ID of the badge
+                picture, Upload, expects a png image. used as icon for the badge
+                description, String, description text of the badge
+                cost, Int, number of points needed to receive the badge
+        if successful returns the new badge object and True
+        if unsuccessful because token was invalid returns an empty value for ok
+        if unsuccessful because token did not possess admin claim or because badge id was taken returns Null and False
+    """
+    class Arguments:
+        token = String(required=True)
+        name = String(required=True)
+        badge_id = String(required=True)
+        picture = Upload(required=True)
+        description = String(required=True)
+        cost = Int(required=True)
+
+    ok = Field(ProtectedBool)
+    badge = Field(Badge)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, name, badge_id, picture, description, cost):
+        # ensure caller is admin
+        if get_jwt_claims() == admin_claim:
+            # ensure badge id is unique
+            if not BadgeModel.objects(id=badge_id):
+                badge = BadgeModel(id=badge_id, name=name, description=description, cost=cost)
+                badge.picture.put(picture, content_type='image/png')
+                badge.save()
+                badge.reload()
+                # add badge to the progress dict of all users.
+                for user in UserModel.objects.all():
+                    badges = user.badge_progress
+                    badges[badge_id] = 0
+                    user.update(set__badge_progress=badges)
+                    user.save()
+                return CreateBadge(badge=badge, ok=BooleanField(boolean=True))
+            else:
+                return CreateBadge(badge=None, ok=BooleanField(boolean=False))
+        else:
+            return CreateBadge(badge=None, ok=BooleanField(boolean=False))
+
+
+class CreateProfilePicture(Mutation):
+    """
+        create a new profile picture for users to choose.
+        Parameters:
+            token, String, valid jwt access token of an admin
+            picture, Upload, the profile picture in png format
+        if successful returns True
+        if unsuccessful because token was invalid returns empty value
+        if unsuccessful because token did not belong to admin returns False
+    """
+    class Arguments:
+        token = String(required=True)
+        picture = Upload(required=True)
+
+    ok = Field(ProtectedBool)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, picture):
+        if not get_jwt_claims() == admin_claim:
+            return CreateProfilePicture(ok=BooleanField(boolean=False))
+        pic = ProfilePictureModel()
+        pic.picture.put(picture, content_type='image/png')
+        pic.save()
+        return CreateProfilePicture(ok=BooleanField(boolean=True))
+
+
+class CreatePicture(Mutation):
+    class Arguments:
+        token = String(required=True)
+        picture = Upload(required=True)
+        description = String()
+
+    ok = Field(ProtectedBool)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, picture, description=None):
+        if not get_jwt_claims() == admin_claim:
+            return CreatePicture(ok=BooleanField(boolean=False))
+        pic = PictureModel(description=description)
+        pic.picture.put(picture, content_type='image/png')
+        pic.save()
+        return CreatePicture(ok=BooleanField(boolean=True))
+
+# TODO:
+#       update badge
+#       update picture
+#       update profile picture
+
+
+class EditCheckpoint(Mutation):
+    """
+        Allows admins to edit arbitrary checkpoints e.g. to correct spelling mistakes in tours submitted for review
+
+    """
+    class Arguments:
+        token = String(required=True)
+        checkpoint_id = String(required=True)
+        text = String()
+        object_id = String()
+        picture_id = String()
+        question = String()
+        linked_objects = List(String)
+        possible_answers = List(String)
+        correct_answers = List(Int)
+        max_choices = Int()
+
+    checkpoint = Field(lambda: CheckpointUnion)
+    ok = Field(ProtectedBool)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, checkpoint_id, **kwargs):
+        # assert caller is admin
+        if not get_jwt_claims() == admin_claim:
+            return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+        # assert checkpoint exists
+        if not CheckpointModel.objects(id=checkpoint_id):
+            return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+        # get checkpoint object
+        checkpoint = CheckpointModel.objects.get(id=checkpoint_id)
+        # get all the optional arguments
+        text = kwargs.get('text', None)
+        object_id = kwargs.get('object_id', None)
+        picture_id = kwargs.get('picture_id', None)
+        question = kwargs.get('question', None)
+        linked_objects = kwargs.get('linked_objects', None)
+        possible_answers = kwargs.get('possible_answers', None)
+        correct_answers = kwargs.get('correct_answers', None)
+        max_choices = kwargs.get('max_choices', None)
+        # treat checkpoint update depending on the type of the checkpoint
+        if isinstance(checkpoint, ObjectCheckpointModel):
+            # assert new object exists
+            if object_id is not None:
+                if not MuseumObjectModel.objects(object_id=object_id):
+                    return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+                museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+                checkpoint.update(set__museum_object=museum_object)
+                # text may be changed on any checkpoint
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+        elif isinstance(checkpoint, PictureCheckpointModel):
+            # assert new picture exists
+            if picture_id is not None:
+                if not PictureModel.objects(id=picture_id):
+                    return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+                pic = PictureModel.objects.get(id=picture_id)
+                checkpoint.update(set__picture=pic)
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+        # check MCQuestion first because a MCQuestion would pass the check for isinstance(checkpoint,QuestionModel)
+        elif isinstance(checkpoint, MCQuestionModel):
+            # question text is inherited from question
+            if question is not None:
+                checkpoint.update(set__question=question)
+            if possible_answers is not None:
+                checkpoint.update(set__possible_answers=possible_answers)
+            if correct_answers is not None:
+                checkpoint.update(set__correct_answers=correct_answers)
+            if max_choices is not None:
+                checkpoint.update(set__max_choices=max_choices)
+            # linked objects are also inherited from question
+            if linked_objects is not None:
+                checkpoint.update(set__linked_objects=linked_objects)
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+        elif isinstance(checkpoint, QuestionModel):
+            if question is not None:
+                checkpoint.update(set__question=question)
+            if linked_objects is not None:
+                checkpoint.update(set__linked_objects=linked_objects)
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+        # last remaining option is a basic text checkpoint
+        else:
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+
+
 class Mutation(ObjectType):
     create_user = CreateAdmin.Field()
     auth = Auth.Field()
@@ -579,3 +822,7 @@ class Mutation(ObjectType):
     deny_review = DenyReview.Field()
     accept_review = AcceptReview.Field()
     read_feedback = ReadFeedback.Field()
+    create_badge = CreateBadge.Field()
+    create_picture = CreatePicture.Field()
+    create_profile_picture = CreateProfilePicture.Field()
+    edit_checkpoint = EditCheckpoint.Field()

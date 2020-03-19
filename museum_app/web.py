@@ -9,7 +9,7 @@ serves app.Schema.web_schema
 web = Blueprint('web', __name__, template_folder="models", url_prefix='/web')
 
 
-@web.route('/', methods=['POST'])
+@web.route('/', methods=['POST', 'GET'])
 def web_endpoint():
     """Endpoint for the web schema. Accepts POST requests at /web/ and returns the results in json. """
     data = json.loads(request.data)

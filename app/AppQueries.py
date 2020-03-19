@@ -1,6 +1,6 @@
 from flask_graphql_auth import get_jwt_identity, query_jwt_required
 from graphene import ObjectType, List, String, Field
-from app.Fields import User, Favourites, Tour, MuseumObject, Answer, TourFeedback, Question
+from app.Fields import User, Favourites, Tour, MuseumObject, Answer, TourFeedback, Question, Checkpoint
 from models.User import User as UserModel
 from models.Tour import Tour as TourModel
 from models.Answer import Answer as AnswerModel
@@ -8,6 +8,7 @@ from models.Favourites import Favourites as FavouritesModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.TourFeedback import TourFeedback as TourFeedbackModel
 from models.Question import Question as QuestionModel
+from models.Checkpoint import Checkpoint as CheckpointModel
 
 """
     These are the queries available to the App API. 
@@ -67,6 +68,7 @@ class Query(ObjectType):
     owned_tours = List(Tour, token=String())
     """Returns all feedback submitted for a tour. Can only be queried by the Tour owner."""
     feedback = List(TourFeedback, token=String(), tour_id=String())
+    checkpoints_by_tour = List(Checkpoint, token=String(), tour_id=String())
 
     @classmethod
     @query_jwt_required
@@ -110,50 +112,16 @@ class Query(ObjectType):
                 return list(TourFeedbackModel.objects(tour=tour))
         return []
 
-    # queries related to questions and answers
-    answers_to_question = List(Question, token=String(), question_id=String())
-    answers_by_user = List(Answer, token=String(), tour_id=String(), user=String())
-    my_answers = List(Answer, token=String(), tour_id=String())
-
     @classmethod
     @query_jwt_required
-    def resolve_answers_to_question(cls, _, info, question_id):
-        if QuestionModel.objects(id=question_id):
-            question = QuestionModel.objects.get(id=question_id)
-            return list(AnswerModel.objects(question=question))
-        else:
-            return None
-
-    # TODO: when adding public and private answers gate private answers to the tour owner
-
-    @classmethod
-    @query_jwt_required
-    def resolve_answers_by_user(cls, _, info, username, tour_id):
-        if UserModel.objects(username=username):
-            user = UserModel.objects.get(username=username)
-            if TourModel.objects(id=tour_id):
-                tour = TourModel.objects.get(id=tour_id)
-                answers = []
-                for answer in tour.answers:
-                    if answer.user == user:
-                        answers.append(answer)
-                return answers
-        return None
-
-    @classmethod
-    @query_jwt_required
-    def resolve_my_answers(cls, _, info, tour_id):
+    def resolve_checkpoints_by_tour(cls, _, info, tour_id):
+        user = UserModel.objects.get(username=get_jwt_identity())
         if TourModel.objects(id=tour_id):
             tour = TourModel.objects.get(id=tour_id)
-            username = get_jwt_identity()
-            if UserModel.objects(username=username):
-                user = UserModel.objects.get(username=username)
-                answers = []
-                for answer in tour.answers:
-                    if answer.user == user:
-                        answers.append(answer)
-                return answers
-        return None
+            if user in tour.users:
+                if CheckpointModel.objects(tour=tour):
+                    return list(CheckpointModel.objects(tour=tour))
+        return []
 
     # master query for objects
     museum_object = List(MuseumObject, object_id=String(),
@@ -162,7 +130,6 @@ class Query(ObjectType):
                          title=String(),
                          token=String(required=True),
                          year=String(),
-                         picture=String(),
                          art_type=String(),
                          creator=String(),
                          material=String(),
