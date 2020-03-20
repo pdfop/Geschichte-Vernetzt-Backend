@@ -1,13 +1,8 @@
-from flask import Flask, request
-import io
-from flask_graphql import GraphQLView
+from flask import Flask
+from flask_cors import CORS
 from flask_graphql_auth import GraphQLAuth
 import os
-
-from models.Picture import Picture
 from .extensions import mongo
-from museum_app.web import web as web_blueprint
-from museum_app.app import app as app_blueprint
 from app.Schema import web_schema, app_schema
 from graphene_file_upload.flask import FileUploadGraphQLView
 
@@ -16,21 +11,27 @@ def create_app(config_object='museum_app.settings'):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
     mongo.init_app(app)
+    # flask-graphql-auth bind
     auth = GraphQLAuth(app)
-    # GraphiQl Binds
+    # flask-cors bind
+    cors = CORS(app)
+
+    # Endpoints
     app.add_url_rule(
-        '/web/graphql',
+        '/web/',
         view_func=FileUploadGraphQLView.as_view(
-            'webgraphql',
+            'web',
             schema=web_schema,
+            # TODO: set to false for production
             graphiql=True
         )
     )
     app.add_url_rule(
-        '/app/graphql',
+        '/app/',
         view_func=FileUploadGraphQLView.as_view(
-            'appgraphql',
+            'app',
             schema=app_schema,
+            # TODO: set to false for production
             graphiql=True
         )
     )
@@ -39,6 +40,7 @@ def create_app(config_object='museum_app.settings'):
     except OSError:
         pass
 
+    # TODO: remove for production
     # landing page for entire app
     @app.route('/')
     def hello():
@@ -68,7 +70,5 @@ def create_app(config_object='museum_app.settings'):
         #                 attachment_filename='logo.png',
          #                mimetype='image/png')
     # adding blueprints for endpoints
-    app.register_blueprint(app_blueprint)
-    app.register_blueprint(web_blueprint)
     return app
 
