@@ -1,7 +1,7 @@
 import json
 
-from flask import Flask
-from flask_cors import CORS
+from flask import Flask, request
+from flask_cors import CORS, cross_origin
 from flask_graphql_auth import GraphQLAuth
 import os
 from .extensions import mongo
@@ -50,11 +50,11 @@ def create_app(config_object='museum_app.settings'):
 
     # TODO:
     #   remove, use for testing if cors is still broken
-    #@app.route('/web/cors', methods=['POST', 'GET'])
-    #@cross_origin(supports_credentials=True)
-    #def cors_endpoint():
-    #    data = json.loads(request.data)
-    #    return json.dumps(web_schema.execute(data['query'])).data
+    @app.route('/web/cors', methods=['POST', 'GET'])
+    @cross_origin(supports_credentials=True)
+    def cors_endpoint():
+        data = json.loads(request.data)
+        return json.dumps(web_schema.execute(data['query']).data)
 
 # TODO: delete this when im done referencing it
   #  from flask import send_file
