@@ -4,7 +4,7 @@ from graphene import ObjectType, List, Mutation, String, Field, Boolean, Int
 from werkzeug.security import generate_password_hash, check_password_hash
 from .ProtectedFields import ProtectedBool, BooleanField, ProtectedString, StringField
 from app.Fields import User, AppFeedback, Favourites, Tour, Question, Answer, TourFeedback, MuseumObject, MCQuestion, \
-    MCAnswer, Checkpoint, PictureCheckpoint, ObjectCheckpoint
+    MCAnswer, Checkpoint, PictureCheckpoint, ObjectCheckpoint, CheckpointUnion
 from models.User import User as UserModel
 from models.Code import Code as CodeModel
 from models.Tour import Tour as TourModel
@@ -578,7 +578,13 @@ class CreateCheckpoint(Mutation):
         user = UserModel.objects.get(username=get_jwt_identity())
         if not user == tour.owner:
             return CreateCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
-        checkpoint = CheckpointModel(tour=tour)
+        # add checkpoint to the end of the tour
+        current_index = tour.current_checkpoints
+        current_index += 1
+        tour.update(set__current_checkpoints=current_index)
+        tour.save()
+        tour.reload()
+        checkpoint = CheckpointModel(tour=tour, index=current_index)
         text = kwargs.get('text', None)
         if text is not None:
             checkpoint.update(set__text=text)
@@ -627,10 +633,16 @@ class CreatePictureCheckpoint(Mutation):
         picture = kwargs.get('picture', None)
         picture_description = kwargs.get('picture_description', None)
         text = kwargs.get('text', None)
+        # add checkpoint to the end of the tour
+        current_index = tour.current_checkpoints
+        current_index += 1
+        tour.update(set__current_checkpoints=current_index)
+        tour.save()
+        tour.reload()
         if picture_id is not None:
             if PictureModel(id=picture_id):
                 pic = PictureModel(id=picture_id)
-                checkpoint = PictureCheckpointModel(picture=pic, tour=tour, text=text)
+                checkpoint = PictureCheckpointModel(picture=pic, tour=tour, text=text, index=current_index)
                 checkpoint.save()
                 return CreatePictureCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
             else:
@@ -639,12 +651,26 @@ class CreatePictureCheckpoint(Mutation):
             x = PictureModel(description=picture_description)
             x.picture.put(picture, content_type='image/png')
             x.save()
-            checkpoint = PictureCheckpointModel(picture=x, tour=tour, text=text)
+            checkpoint = PictureCheckpointModel(picture=x, tour=tour, text=text, index=current_index)
             checkpoint.save()
             return CreatePictureCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
 
 class CreateObjectCheckpoint(Mutation):
+    """
+        Creates a Checkpoint referencing an Object.
+        Parameters:
+            token, String, valid jwt access token of the tour owner
+            tour_id, String, id of a tour to add the checkpoint to
+            object_id, String, object_id of the object to reference
+            text, String, additional optional description text for the checkpoint
+        if successful returns the created checkpoint and True
+        if unsuccessful because the token was invalid returns an empty value for ok
+        returns Null and False if unsuccessful because
+            user did not own the tour
+            tour reference did not exist
+            referenced object did not exist
+    """
     class Arguments:
         token = String(required=True)
         tour_id = String(required=True)
@@ -666,13 +692,31 @@ class CreateObjectCheckpoint(Mutation):
             return CreateObjectCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
         if not MuseumObjectModel.objects(object_id=object_id):
             return CreateObjectCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+        # add checkpoint to the end of the tour
+        current_index = tour.current_checkpoints
+        current_index += 1
+        tour.update(set__current_checkpoints=current_index)
+        tour.save()
+        tour.reload()
         museum_object = MuseumObjectModel.objects.get(object_id=object_id)
-        checkpoint = ObjectCheckpointModel(tour=tour, museum_object=museum_object, text=text)
+        checkpoint = ObjectCheckpointModel(tour=tour, museum_object=museum_object, text=text, index=current_index)
         checkpoint.save()
         return CreateObjectCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
 
 class CreateAnswer(Mutation):
+    """
+        Creates an Answer to a regular text question
+        Parameters:
+            token, String, valid jwt access token
+            answer, String, text answer to the question
+            question, String, id of the question
+        returns the answer and True if successful
+        returns empty value because token was invalid
+        returns Null and False if unsuccessful because
+            user is not member of the tour the question is in
+            question reference was invalid
+    """
     class Arguments:
         token = String(required=True)
         answer = String(required=True)
@@ -692,6 +736,10 @@ class CreateAnswer(Mutation):
             if QuestionModel.objects(id=question):
                 question = QuestionModel.objects.get(id=question)
             else:
+                return CreateAnswer(answer=None, ok=BooleanField(boolean=False))
+            # ensure user is member of the tour
+            tour = question.tour
+            if user not in tour.users:
                 return CreateAnswer(answer=None, ok=BooleanField(boolean=False))
             # creating and submitting a new answer
             if not AnswerModel.objects(question=question, user=user):
@@ -742,6 +790,10 @@ class CreateMCAnswer(Mutation):
                 question = MCQuestionModel.objects.get(id=question)
             else:
                 return CreateAnswer(answer=None, ok=BooleanField(boolean=False), correct=0)
+            # ensuring user is member of the tour
+            tour = question.tour
+            if user not in tour.users:
+                return CreateAnswer(answer=None, ok=BooleanField(boolean=False), correct=0)
             # creating and submitting a new answer
             if not MCAnswerModel.objects(question=question, user=user):
                 # number of answers may not be more than permitted by the question
@@ -760,6 +812,20 @@ class CreateMCAnswer(Mutation):
 
 
 class CreateQuestion(Mutation):
+    """
+        Creating text Question and adding it to the end of the tour
+        Parameters:
+            token, String, valid jwt access token
+            question_text, String, the text of the question
+            tour_id, String, id of the tour to add the checkpoint to
+            linked_objects, List of String, list of object_id of objects the question references
+        if successful returns the created question and ok=True
+        if unsuccessful because the token was invalid returns empty value for ok
+        returns Null and False if unsuccessful because
+            tour did not exist
+            user did not own the tour
+            an object referenced in linked_objects did not exist
+    """
     class Arguments:
         token = String(required=True)
         linked_objects = List(of_type=String)
@@ -781,8 +847,24 @@ class CreateQuestion(Mutation):
                 tour = TourModel.objects.get(id=tour_id)
                 # assert user is owner of the tour
                 if tour.owner == user:
-                    question = QuestionModel(linked_objects=linked_objects,
-                                             question=question_text, tour=tour)
+                    # resolve references to linked objects if any are given:
+                    links = []
+                    if linked_objects:
+                        for object_id in linked_objects:
+                            if MuseumObjectModel.objects(object_id=object_id):
+                                museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+                                links.append(museum_object)
+                            else:
+                                return CreateQuestion(question=None, ok=BooleanField(boolean=False))
+
+                    # add checkpoint to the end of the tour
+                    current_index = tour.current_checkpoints
+                    current_index += 1
+                    tour.update(set__current_checkpoints=current_index)
+                    tour.save()
+                    tour.reload()
+                    question = QuestionModel(linked_objects=links,
+                                             question=question_text, tour=tour, index=current_index)
                     question.save()
                     return CreateQuestion(question=question,
                                           ok=BooleanField(boolean=True))
@@ -791,6 +873,23 @@ class CreateQuestion(Mutation):
 
 
 class CreateMCQuestion(Mutation):
+    """
+        Creating  MCQuestion and adding it to the end of the tour
+        Parameters:
+            token, String, valid jwt access token
+            question_text, String, the text of the question
+            tour_id, String, id of the tour to add the checkpoint to
+            linked_objects, List of String, list of object_id of objects the question references
+            max_choices, Int, maximum numbers of answers that can be chosen
+            possible_answers, List of String, list of possible answers to the question
+            correct_answers, List of Int, indices of the answers in possible_answers that are correct
+        if successful returns the created multiple choice question and ok=True
+        if unsuccessful because the token was invalid returns empty value for ok
+        returns Null and False if unsuccessful because
+            tour did not exist
+            user did not own the tour
+            an object referenced in linked_objects did not exist
+    """
     class Arguments:
         token = String(required=True)
         linked_objects = List(of_type=String)
@@ -815,9 +914,25 @@ class CreateMCQuestion(Mutation):
                 tour = TourModel.objects.get(id=tour_id)
                 # assert user is owner of the tour
                 if tour.owner == user:
-                    question = MCQuestionModel(linked_objects=linked_objects,
+                    links = []
+                    if linked_objects:
+                        for object_id in linked_objects:
+                            if MuseumObjectModel.objects(object_id=object_id):
+                                museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+                                links.append(museum_object)
+                            else:
+                                return CreateMCQuestion(question=None, ok=BooleanField(boolean=False))
+
+                    # add checkpoint to the end of the tour
+                    current_index = tour.current_checkpoints
+                    current_index += 1
+                    tour.update(set__current_checkpoints=current_index)
+                    tour.save()
+                    tour.reload()
+                    question = MCQuestionModel(linked_objects=links,
                                                question=question_text, possible_answers=possible_answers,
-                                               correct_answers=correct_answers, max_choices=max_choices, tour=tour)
+                                               correct_answers=correct_answers, max_choices=max_choices, tour=tour,
+                                               index=current_index)
                     question.save()
                     return CreateMCQuestion(question=question,
                                             ok=BooleanField(boolean=True))
@@ -1043,6 +1158,70 @@ class SubmitFeedback(Mutation):
             return SubmitFeedback(ok=BooleanField(boolean=False), feedback=None)
 
 
+class MoveCheckpoint(Mutation):
+    class Arguments:
+        token = String(required=True)
+        checkpoint_id = String(required=True)
+        index = Int(required=True)
+
+    ok = Field(ProtectedBool)
+    checkpoint = Field(lambda: CheckpointUnion)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, checkpoint_id, index):
+        user = UserModel.objects.get(username=get_jwt_identity())
+        # assert checkpoint exists
+        if not CheckpointModel.objects(id=checkpoint_id):
+            return MoveCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+        checkpoint = CheckpointModel.objects.get(id=checkpoint_id)
+        tour = checkpoint.tour
+        # assert user owns the tour
+        if tour.owner != user:
+            return MoveCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+        current_index = checkpoint.index
+        max_index = tour.current_checkpoints
+        checkpoints = CheckpointModel.objects(tour=tour)
+        checkpoints = checkpoints(id__ne=checkpoint_id)
+        # move checkpoint to the end of the list
+        if index == -1 or index >= max_index:
+            checkpoint.update(set__index=max_index)
+            checkpoint.save()
+            checkpoint.reload()
+            for cp in checkpoints():
+                # move all checkpoints coming after the old index one back
+                if cp.index > current_index:
+                    cpidx = cp.index
+                    cpidx -= 1
+                    cp.update(set__index=cpidx)
+                    cp.save()
+                    cp.reload()
+        # move all checkpoints between the new and old
+        elif index < current_index:
+            checkpoint.update(set__index=index)
+            checkpoint.save()
+            checkpoint.reload()
+            for cp in checkpoints():
+                if current_index > cp.index >= index:
+                    cpidx = cp.index
+                    cpidx += 1
+                    cp.update(set__index=cpidx)
+                    cp.save()
+                    cp.reload()
+        # move all checkpoints between old and new index one
+        elif index > current_index:
+            checkpoint.update(set__index=index)
+            checkpoint.save()
+            checkpoint.reload()
+            for cp in checkpoints():
+                if current_index < cp.index <= index:
+                    cpidx = cp.index
+                    cpidx -= 1
+                    cp.update(set__index=cpidx)
+                    cp.save()
+                    cp.reload()
+        return MoveCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+
 # TODO: to be removed, does nothing
 class FileUpload(Mutation):
     class Arguments:
@@ -1085,3 +1264,4 @@ class Mutation(ObjectType):
     create_checkpoint = CreateCheckpoint.Field()
     create_picture_checkpoint = CreatePictureCheckpoint.Field()
     create_object_checkpoint = CreateObjectCheckpoint.Field()
+    move_checkpoint = MoveCheckpoint.Field()

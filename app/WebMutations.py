@@ -618,6 +618,7 @@ class CreateBadge(Mutation):
         if unsuccessful because token was invalid returns an empty value for ok
         if unsuccessful because token did not possess admin claim or because badge id was taken returns Null and False
     """
+
     class Arguments:
         token = String(required=True)
         name = String(required=True)
@@ -663,6 +664,7 @@ class CreateProfilePicture(Mutation):
         if unsuccessful because token was invalid returns empty value
         if unsuccessful because token did not belong to admin returns False
     """
+
     class Arguments:
         token = String(required=True)
         picture = Upload(required=True)
@@ -698,17 +700,174 @@ class CreatePicture(Mutation):
         pic.save()
         return CreatePicture(ok=BooleanField(boolean=True))
 
-# TODO:
-#       update badge
-#       update picture
-#       update profile picture
+
+class UpdateBadge(Mutation):
+    """
+        Updates a Badge.
+        Parameters:
+            token, String, valid jwt access token with admin claim
+            badge_id, String, id of the badge to edit
+            picture, Upload, image in png format
+            name, String, new name for the badge
+            description, String, new description for the Badge
+            cost, Int, new cost of the Badge
+            new_id, String, a new id for the badge
+        if successful returns the updated badge and true
+        if unsuccessful because the token is invalid returns empty value for ok
+        returns Null and False if unsuccessful because:
+            badge with badge_id does not exist
+            token does not belong to admin
+            new_id is already in use
+    """
+
+    class Arguments:
+        badge_id = String(required=True)
+        token = String(required=True)
+        picture = Upload()
+        name = String()
+        description = String()
+        cost = Int()
+        new_id = String()
+
+    ok = Field(ProtectedBool)
+    badge = Field(lambda: Badge)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, badge_id, **kwargs):
+        if not get_jwt_claims() == admin_claim:
+            return UpdateBadge(badge=None, ok=BooleanField(boolean=False))
+        if not BadgeModel.objects(id=badge_id):
+            return UpdateBadge(badge=None, ok=BooleanField(boolean=False))
+        badge = BadgeModel.objects.get(id=badge_id)
+        picture = kwargs.get('picture', None)
+        name = kwargs.get('name', None)
+        description = kwargs.get('description', None)
+        cost = kwargs.get('cost', None)
+        new_id = kwargs.get('new_id', None)
+        if new_id is not None:
+            if not BadgeModel.objects(id=new_id):
+                badge.update(set__id=new_id)
+            else:
+                return UpdateBadge(badge=None, ok=BooleanField(boolean=False))
+        if name is not None:
+            badge.update(set__name=name)
+        if cost is not None:
+            badge.update(set__cost=cost)
+        if description is not None:
+            badge.update(set__description=description)
+        if picture is not None:
+            badge.picture.replace(picture, content_type='image/png')
+        badge.save()
+        badge.reload()
+        return UpdateBadge(badge=badge, ok=BooleanField(boolean=True))
+
+
+class UpdatePicture(Mutation):
+    """
+        Updates a Picture.
+        Parameters:
+            token, String, valid jwt access token with admin claim
+            picture_id, String, id of the picture to edit
+            picture, Upload, image in png format
+            description, String, new description for the picture
+
+        if successful returns the updated picture and true
+        if unsuccessful because the token is invalid returns empty value for ok
+        returns Null and False if unsuccessful because:
+            picture with picture_id does not exist
+            token does not belong to admin
+    """
+
+    class Arguments:
+        picture_id = String(required=True)
+        token = String(required=True)
+        picture = Upload()
+        description = String()
+
+    ok = Field(ProtectedBool)
+    picture = Field(lambda: Picture)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, picture_id, **kwargs):
+        if not get_jwt_claims() == admin_claim:
+            return UpdatePicture(picture=None, ok=BooleanField(boolean=False))
+        if not PictureModel.objects(id=picture_id):
+            return UpdatePicture(picture=None, ok=BooleanField(boolean=False))
+        picture_object = PictureModel.objects.get(id=picture_id)
+        picture = kwargs.get('picture', None)
+        description = kwargs.get('description', None)
+
+        if description is not None:
+            picture_object.update(set__description=description)
+        if picture is not None:
+            picture_object.picture.replace(picture, content_type='image/png')
+        picture_object.save()
+        picture_object.reload()
+        return UpdatePicture(picture=picture_object, ok=BooleanField(boolean=True))
+
+
+class UpdateProfilePicture(Mutation):
+    """
+        Updates a profile picture
+        Parameters:
+            token, String, valid jwt access token with admin claim
+            picture_id, String, id of the profile picture to edit
+            picture, Upload, image in png format
+
+        if successful returns the updated profile picture and true
+        if unsuccessful because the token is invalid returns empty value for ok
+        returns Null and False if unsuccessful because:
+            profile picture with picture_id does not exist
+            token does not belong to admin
+    """
+
+    class Arguments:
+        picture_id = String(required=True)
+        token = String(required=True)
+        picture = Upload()
+
+    ok = Field(ProtectedBool)
+    picture = Field(lambda: Picture)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, picture_id, picture):
+        if not get_jwt_claims() == admin_claim:
+            return UpdateProfilePicture(picture=None, ok=BooleanField(boolean=False))
+        if not ProfilePictureModel.objects(id=picture_id):
+            return UpdateProfilePicture(picture=None, ok=BooleanField(boolean=False))
+        profile_picture = ProfilePictureModel.objects.get(id=picture_id)
+        profile_picture.picture.replace(picture, content_type='image/png')
+        profile_picture.save()
+        profile_picture.reload()
+        return UpdateProfilePicture(picture=profile_picture, ok=BooleanField(boolean=True))
 
 
 class EditCheckpoint(Mutation):
     """
         Allows admins to edit arbitrary checkpoints e.g. to correct spelling mistakes in tours submitted for review
+        Parameters:
+            token, String, required, valid jwt of an admin
+            checkpoint_id, String, required, id of the checkpoint to be edited
+            text, String, optional, description text of the checkpoint
+            object_id, optional, object_id of a museum object to update the reference of an ObjectCheckpoint
+            picture_id, optional, id of a Picture to update the reference of a PictureCheckpoint
+            question, String, text to update the question text of a Question or MCQuestion
+            linked_objects, List of String, list of object ids to update the references in a Question or MCQuestion
+            possible_answers, List of String, update the possible answers of a MCQuestion
+            correct_answers, List of Int, update the correct answers of a MCQuestion
+            max_choices, Int, new max choices value for a MCQuestion
+        if successful returns the updated checkpoint and True
+        if unsuccessful because the token was invalid returns emtpy value for ok
+        returns Null and False if unsuccessful because
+            token did not belong to admin
+            checkpoint with checkpoint_id does not exist
+            given a picture_id or object_id or linked_objects and the referenced object did not exist
 
     """
+
     class Arguments:
         token = String(required=True)
         checkpoint_id = String(required=True)
@@ -783,7 +942,13 @@ class EditCheckpoint(Mutation):
                 checkpoint.update(set__max_choices=max_choices)
             # linked objects are also inherited from question
             if linked_objects is not None:
-                checkpoint.update(set__linked_objects=linked_objects)
+                new_links = []
+                for oid in linked_objects:
+                    if not MuseumObjectModel.objects(object_id=oid):
+                        return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+                    else:
+                        new_links.append(MuseumObjectModel.objects.get(object_id=oid))
+                checkpoint.update(set__linked_objects=new_links)
             if text is not None:
                 checkpoint.update(set__text=text)
             checkpoint.save()
@@ -793,7 +958,13 @@ class EditCheckpoint(Mutation):
             if question is not None:
                 checkpoint.update(set__question=question)
             if linked_objects is not None:
-                checkpoint.update(set__linked_objects=linked_objects)
+                new_links = []
+                for oid in linked_objects:
+                    if not MuseumObjectModel.objects(object_id=oid):
+                        return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+                    else:
+                        new_links.append(MuseumObjectModel.objects.get(object_id=oid))
+                checkpoint.update(set__linked_objects=new_links)
             if text is not None:
                 checkpoint.update(set__text=text)
             checkpoint.save()
@@ -825,4 +996,7 @@ class Mutation(ObjectType):
     create_badge = CreateBadge.Field()
     create_picture = CreatePicture.Field()
     create_profile_picture = CreateProfilePicture.Field()
+    update_badge = UpdateBadge.Field()
+    update_picture = UpdatePicture.Field()
+    update_profile_picture = UpdateProfilePicture.Field()
     edit_checkpoint = EditCheckpoint.Field()

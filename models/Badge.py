@@ -7,7 +7,7 @@ class Badge(Document):
     """
     meta = {'db_alias': 'file',
             'collection': 'badge'}
-    id = StringField(required=True, primary_key=True)
+    id = StringField(required=True, primary_key=True, unique=True)
     name = StringField(required=True)
     picture = FileField(content_type='image/png')
     description = StringField(required=True)
