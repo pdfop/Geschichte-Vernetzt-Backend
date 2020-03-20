@@ -14,7 +14,7 @@ def create_app(config_object='museum_app.settings'):
     # flask-graphql-auth bind
     auth = GraphQLAuth(app)
     # flask-cors bind
-    cors = CORS(app, origins=r'http://localhost:8081', supports_credentials=True)
+    cors = CORS(app, resources={r"/*": {"origins": "http://localhost:8081"}}, supports_credentials=True)
 
     # Endpoints
     app.add_url_rule(
