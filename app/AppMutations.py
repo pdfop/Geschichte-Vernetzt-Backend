@@ -254,15 +254,20 @@ class ChooseProfilePicture(Mutation):
             return ChooseProfilePicture(ok=BooleanField(boolean=True))
 
 
-# TODO: rework
-
-
 class DeleteAccount(Mutation):
     """Delete a user account.
        Deleting an account will also delete any tours, questions, answers and favourites created by this user.
        Parameter: token, String, valid jwt access token of the account to be deleted.
        returns True if successful
        returns Null if token was invalid
+       returns True if user does not exist
+       NOTE: also deletes the user's:
+            owned tours
+            checkpoints associated with the tours
+            answers associated with the questions among the checkpoints
+            answers given by the user to other questions
+            favourites
+        all of this is enforce in data models by the reverse_delete_rule on reference fields
        """
 
     class Arguments:
@@ -276,16 +281,6 @@ class DeleteAccount(Mutation):
         username = get_jwt_identity()
         if UserModel.objects(username=username):
             user = UserModel.objects.get(username=username)
-            tours = TourModel.objects(owner=user)
-            for tour in tours:
-                for question in tour.questions:
-                    question.delete()
-                for answer in tour.answers:
-                    answer.delete()
-                tour.delete()
-            answers = AnswerModel.objects(owner=user)
-            for answer in answers:
-                answer.delete()
             user.delete()
         return DeleteAccount(ok=BooleanField(boolean=True))
 
@@ -340,22 +335,28 @@ class AddFavouriteObject(Mutation):
     @mutation_jwt_required
     def mutate(cls, _, info, object_id):
         user = UserModel.objects.get(username=get_jwt_identity())
+        # assert the object exists
         if MuseumObjectModel.objects(object_id=object_id):
             museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+            # check if the user already has a favourites object
             if FavouritesModel.objects(user=user):
                 favourites = FavouritesModel.object.get(user=user)
+                # check if user already has other favourite objects
                 if favourites.favourite_objects:
                     objects = favourites.favourite_objects
+                    # add current object to the list if it is not in it already
                     if museum_object not in objects:
                         objects.append(museum_object)
                         favourites.update(set__favourite_objects=objects)
                         favourites.save()
+                # if the user does not already have a list of favourite objects make one and add the current object
                 else:
                     objects = [museum_object]
                     favourites.update(set__favourite_objects=objects)
                     favourites.save()
                 favourites.reload()
                 return AddFavouriteObject(ok=BooleanField(boolean=True), favourites=favourites)
+            # if the user does not currently have a Favourites object create one and add the current object to it
             else:
                 objects = [museum_object]
                 favourites = FavouritesModel(user=user, favourite_objects=objects)
@@ -1222,6 +1223,56 @@ class MoveCheckpoint(Mutation):
                     cp.reload()
         return MoveCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
+
+class DeleteCheckpoint(Mutation):
+    """
+        Delete a Checkpoint from a Tour
+        Parameters:
+            token, String, valid jwt access token of the owner of the tour the checkpoint belongs to
+            checkpoint_id, String, document id of the checkpoint to delete
+        returns True if successful
+        returns empty value if token was invalid
+        returns False if token owner was not the owner of the tour
+        IS SUCCESSFUL if the checkpoint does not exist
+    """
+    class Arguments:
+        token = String(required=True)
+        checkpoint_id = String(required=True)
+
+    ok = Field(ProtectedBool)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, checkpoint_id):
+        if CheckpointModel.objects(id=checkpoint_id):
+            checkpoint = CheckpointModel.objects.get(id=checkpoint_id)
+        # successful if checkpoint does not exist
+        else:
+            return DeleteCheckpoint(ok=BooleanField(boolean=True))
+        tour = checkpoint.tour
+        user = UserModel.objects.get(username=get_jwt_identity())
+        # assert user owns the tour and thus the checkpoint
+        if user == tour.owner:
+            index = checkpoint.index
+            checkpoints = CheckpointModel.objects(tour=tour)
+            # update the indices of following checkpoints accordingly
+            for cp in checkpoints:
+                if cp.index > index:
+                    cpidx = cp.index
+                    cpidx -= 1
+                    cp.update(set__index=cpidx)
+                    cp.save()
+                    cp.reload()
+            # update the total number of checkpoints in the tour
+            max_index = tour.current_checkpoints
+            max_index -= 1
+            tour.update(set__current_checkpoints=max_index)
+            checkpoint.delete()
+            return DeleteCheckpoint(ok=BooleanField(boolean=True))
+        else:
+            return DeleteCheckpoint(ok=BooleanField(boolean=False))
+
+
 # TODO: to be removed, does nothing
 class FileUpload(Mutation):
     class Arguments:
@@ -1265,3 +1316,4 @@ class Mutation(ObjectType):
     create_picture_checkpoint = CreatePictureCheckpoint.Field()
     create_object_checkpoint = CreateObjectCheckpoint.Field()
     move_checkpoint = MoveCheckpoint.Field()
+    delete_checkpoint = DeleteCheckpoint.Field()

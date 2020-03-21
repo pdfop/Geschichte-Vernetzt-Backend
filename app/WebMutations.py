@@ -427,7 +427,11 @@ class CreateCode(Mutation):
     def mutate(cls, _, info):
         if get_jwt_claims() == admin_claim:
             letters = string.ascii_lowercase
+            # generate random code
             code_string = ''.join(random.choice(letters) for i in range(5))
+            # if the generated code already exists generate a new one
+            while CodeModel.objects(code=code_string):
+                code_string = ''.join(random.choice(letters) for i in range(5))
             code = CodeModel(code=code_string)
             code.save()
             return CreateCode(ok=BooleanField(boolean=True), code=StringField(string=code_string))
@@ -547,7 +551,7 @@ class AcceptReview(Mutation):
          returns the updated tour object and True if successful
          returns Null and False if tour does not exist or token does not have admin claim
          returns Null and empty value if token was invalid
-         sets the tours status field back to featured
+         sets the tours status field to featured
     """
 
     class Arguments:

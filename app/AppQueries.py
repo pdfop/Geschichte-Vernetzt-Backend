@@ -1,6 +1,6 @@
 from flask_graphql_auth import get_jwt_identity, query_jwt_required
 from graphene import ObjectType, List, String, Field
-from app.Fields import User, Favourites, Tour, MuseumObject, Answer, TourFeedback, Question, Checkpoint
+from app.Fields import User, Favourites, Tour, MuseumObject, Answer, TourFeedback, Question, Checkpoint, CheckpointUnion
 from models.User import User as UserModel
 from models.Tour import Tour as TourModel
 from models.Answer import Answer as AnswerModel
@@ -68,7 +68,12 @@ class Query(ObjectType):
     owned_tours = List(Tour, token=String())
     """Returns all feedback submitted for a tour. Can only be queried by the Tour owner."""
     feedback = List(TourFeedback, token=String(), tour_id=String())
-    checkpoints_by_tour = List(Checkpoint, token=String(), tour_id=String())
+    """returns all checkpoints that are part of the tour """
+    checkpoints_tour = List(CheckpointUnion, token=String(), tour_id=String())
+    """returns a single tour by search_id"""
+    tour_search_id = List(String, token=String(), search_id=String())
+    """returns a single checkpoint by id"""
+    checkpoint_id = List(CheckpointUnion, token=String(), checkpoint_id=String())
 
     @classmethod
     @query_jwt_required
@@ -114,7 +119,7 @@ class Query(ObjectType):
 
     @classmethod
     @query_jwt_required
-    def resolve_checkpoints_by_tour(cls, _, info, tour_id):
+    def resolve_checkpoints_tour(cls, _, info, tour_id):
         user = UserModel.objects.get(username=get_jwt_identity())
         if TourModel.objects(id=tour_id):
             tour = TourModel.objects.get(id=tour_id)
@@ -123,7 +128,31 @@ class Query(ObjectType):
                     return list(CheckpointModel.objects(tour=tour))
         return []
 
+    @classmethod
+    @query_jwt_required
+    def resolve_tour_search_id(cls, _, info, search_id):
+        """ NOTE: This only returns the tour id, not the tour object.
+        The id can be used in combination with the session id to join the tour. Users that are a member of a tour can use
+         the id of the tour to get the tour object which allows for further retrieval of tour fields and checkpoints.
+         """
+        if TourModel.objects(search_id=search_id):
+            tour = TourModel.objects.get(search_id=search_id)
+            return [tour.id]
+        return []
+
+    @classmethod
+    @query_jwt_required
+    def resolve_checkpoint_id(cls, _, info, checkpoint_id):
+        user = UserModel.objects.get(username=get_jwt_identity())
+        if CheckpointModel.objects(id=checkpoint_id):
+            checkpoint = CheckpointModel.objects.get(id=checkpoint_id)
+            tour = checkpoint.tour
+            if user == tour.owner:
+                return [checkpoint]
+        return []
+
     # master query for objects
+
     museum_object = List(MuseumObject, object_id=String(),
                          category=String(),
                          sub_category=String(),

@@ -9,4 +9,3 @@ class Admin(Document):
             'collection': 'admin'}
     username = StringField(required=True)
     password = StringField(required=True)
-    producer = BooleanField(default=True)

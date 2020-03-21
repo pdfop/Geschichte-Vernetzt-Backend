@@ -1,5 +1,4 @@
 import json
-
 from flask import Flask, request
 from flask_cors import CORS, cross_origin
 from flask_graphql_auth import GraphQLAuth
@@ -7,6 +6,7 @@ import os
 from .extensions import mongo
 from app.Schema import web_schema, app_schema
 from graphene_file_upload.flask import FileUploadGraphQLView
+from museum_app.file import fileBP
 
 
 def create_app(config_object='museum_app.settings'):
@@ -56,28 +56,6 @@ def create_app(config_object='museum_app.settings'):
         data = json.loads(request.data)
         return json.dumps(web_schema.execute(data['query']).data)
 
-# TODO: delete this when im done referencing it
-  #  from flask import send_file
-   # @app.route('/upload/', methods=['POST'])
-    #def upload():
-     #   f = request.files['file']
-      #  pic = Picture(description="ne")
-       # pic.picture.put(f, content_type='image/png')
-        #pic.save()
-        #pic.reload()
-        #raw = pic.picture.read()
-
-       # return send_file(io.BytesIO(raw),
-      #                   attachment_filename='logo.png',
-       #                  mimetype='image/png')
-
-    #@app.route('/getfile',methods=['GET'])
-    #def getfile():
-     #   pic = Picture.objects.get(id="5e6f9535e980580baec1e28f")
-      #  raw = pic.picture.read()
-       # return send_file(io.BytesIO(raw),
-        #                 attachment_filename='logo.png',
-         #                mimetype='image/png')
-    # adding blueprints for endpoints
+    app.register_blueprint(fileBP)
     return app
 
