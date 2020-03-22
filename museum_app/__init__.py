@@ -1,5 +1,5 @@
 import json
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 from flask_graphql_auth import GraphQLAuth
 import os
@@ -55,6 +55,10 @@ def create_app(config_object='museum_app.settings'):
     def cors_endpoint():
         data = json.loads(request.data)
         return json.dumps(web_schema.execute(data['query']).data)
+
+    @app.before_request
+    def handshake():
+        return jsonify({'Hi':"Mo"})
 
     app.register_blueprint(fileBP)
     return app
