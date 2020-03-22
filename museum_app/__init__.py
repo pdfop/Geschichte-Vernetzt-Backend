@@ -51,7 +51,14 @@ def create_app(config_object='museum_app.settings'):
 
     @app.before_request
     def handshake():
-        pass
+        if request.endpoint == 'web':
+            data = json.loads(request.data)
+            return json.dumps(web_schema.execute(data['query']).data)
+        elif request.endpoint == 'app':
+            data = json.loads(request.data)
+            return json.dumps(app_schema.execute(data['query']).data)
+        else:
+            pass
 
     app.register_blueprint(fileBP)
     return app
