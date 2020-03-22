@@ -16,7 +16,8 @@ def create_app(config_object='museum_app.settings'):
     # flask-graphql-auth bind
     auth = GraphQLAuth(app)
     # flask-cors bind
-    cors = CORS(app, resources={r"/*": {"origins": "http://localhost:8081"}}, supports_credentials=True)
+    cors = CORS(app, origin='http://130.83.247.244', expose_headers=['Authorization', 'Content-Type'],
+                supports_credentials=True)
 
     # Endpoints
     app.add_url_rule(
@@ -47,14 +48,6 @@ def create_app(config_object='museum_app.settings'):
     @app.route('/')
     def hello():
         return 'Hello World!'
-
-    # TODO:
-    #   remove, use for testing if cors is still broken
-    @app.route('/web/cors', methods=['POST', 'GET'])
-    @cross_origin(supports_credentials=True)
-    def cors_endpoint():
-        data = json.loads(request.data)
-        return json.dumps(web_schema.execute(data['query']).data)
 
     @app.before_request
     def handshake():
