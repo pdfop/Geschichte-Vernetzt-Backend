@@ -1317,3 +1317,4 @@ class Mutation(ObjectType):
     create_object_checkpoint = CreateObjectCheckpoint.Field()
     move_checkpoint = MoveCheckpoint.Field()
     delete_checkpoint = DeleteCheckpoint.Field()
+

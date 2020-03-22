@@ -1,12 +1,11 @@
-import json
-from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin
+from flask import Flask
 from flask_graphql_auth import GraphQLAuth
 import os
 from .extensions import mongo
 from app.Schema import web_schema, app_schema
 from graphene_file_upload.flask import FileUploadGraphQLView
 from museum_app.file import fileBP
+from flask_jwt_extended import JWTManager
 
 
 def create_app(config_object='museum_app.settings'):
@@ -15,9 +14,8 @@ def create_app(config_object='museum_app.settings'):
     mongo.init_app(app)
     # flask-graphql-auth bind
     auth = GraphQLAuth(app)
-    # flask-cors bind
-    cors = CORS(app, origin='http://130.83.247.244', expose_headers=['Authorization', 'Content-Type'],
-                supports_credentials=True)
+    # flask-jwt-extended bind
+    jwt = JWTManager(app)
 
     # Endpoints
     app.add_url_rule(
@@ -48,17 +46,6 @@ def create_app(config_object='museum_app.settings'):
     @app.route('/')
     def hello():
         return 'Hello World!'
-
-    @app.before_request
-    def handshake():
-        if request.endpoint == 'web':
-            data = json.loads(request.data)
-            return json.dumps(web_schema.execute(data['query']).data)
-        elif request.endpoint == 'app':
-            data = json.loads(request.data)
-            return json.dumps(app_schema.execute(data['query']).data)
-        else:
-            pass
 
     app.register_blueprint(fileBP)
     return app
