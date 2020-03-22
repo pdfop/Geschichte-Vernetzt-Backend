@@ -51,7 +51,7 @@ def create_app(config_object='museum_app.settings'):
 
     @app.before_request
     def handshake():
-        return jsonify({'Hi':"Mo"})
+        pass
 
     app.register_blueprint(fileBP)
     return app
