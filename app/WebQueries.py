@@ -20,6 +20,7 @@ class Query(ObjectType):
     tour = List(Tour, token=String(), tour_id=String())
     checkpoint = List(CheckpointUnion, token=String(), checkpoint_id=String())
     checkpoints_by_tour = List(CheckpointUnion, token=String(), tour_id=String())
+    all_objects = List(MuseumObject, token=String())
     museum_object = List(MuseumObject, object_id=String(),
                          category=String(),
                          sub_category=String(),
@@ -151,3 +152,8 @@ class Query(ObjectType):
                 if CheckpointModel.objects(tour=tour):
                     return list(CheckpointModel.objects(tour=tour))
         return []
+
+    @classmethod
+    @query_jwt_required
+    def resolve_all_objects(cls, _, info):
+        return MuseumObjectModel.objects.all()

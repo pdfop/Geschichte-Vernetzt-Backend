@@ -166,6 +166,7 @@ class Query(ObjectType):
                          location=String(),
                          description=String(),
                          interdisciplinary_context=String())
+    all_objects = List(MuseumObject, token=String())
 
     @classmethod
     @query_jwt_required
@@ -212,3 +213,7 @@ class Query(ObjectType):
             result = result(interdisciplinary_context=interdisciplinary_context)
         return list(result)
 
+    @classmethod
+    @query_jwt_required
+    def resolve_all_objects(cls, _, info):
+        return MuseumObjectModel.objects.all()
