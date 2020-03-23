@@ -308,12 +308,14 @@ class SendFeedback(Mutation):
     @mutation_jwt_required
     def mutate(cls, _, info, review, rating):
         # assert that the rating is on the 1-5 scale
-        if rating in range(1, 6):
-            feedback = AppFeedbackModel(review=review, rating=rating)
-            feedback.save()
-            # after feedback has been created it will be available to read for admins
-            return SendFeedback(ok=BooleanField(boolean=True), feedback=feedback)
-        return SendFeedback(ok=BooleanField(boolean=False), feedback=None)
+        if rating < 1:
+            rating = 1
+        elif rating > 5:
+            rating = 5
+        feedback = AppFeedbackModel(review=review, rating=rating)
+        feedback.save()
+        # after feedback has been created it will be available to read for admins
+        return SendFeedback(ok=BooleanField(boolean=True), feedback=feedback)
 
 
 class AddFavouriteObject(Mutation):
@@ -340,7 +342,7 @@ class AddFavouriteObject(Mutation):
             museum_object = MuseumObjectModel.objects.get(object_id=object_id)
             # check if the user already has a favourites object
             if FavouritesModel.objects(user=user):
-                favourites = FavouritesModel.object.get(user=user)
+                favourites = FavouritesModel.objects.get(user=user)
                 # check if user already has other favourite objects
                 if favourites.favourite_objects:
                     objects = favourites.favourite_objects
@@ -1038,7 +1040,7 @@ class UpdateSessionId(Mutation):
 
     class Arguments:
         token = String(required=True)
-        tour = String(required=True)
+        tour_id = String(required=True)
         session_id = Int(required=True)
 
     ok = Field(ProtectedBool)
@@ -1046,10 +1048,10 @@ class UpdateSessionId(Mutation):
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, tour, session_id):
+    def mutate(cls, _, info, tour_id, session_id):
         # assert tour exists
-        if TourModel.objects(id=tour):
-            tour = TourModel.objects.get(id=tour)
+        if TourModel.objects(id=tour_id):
+            tour = TourModel.objects.get(id=tour_id)
             username = get_jwt_identity()
             # assert caller is the owner of the tour
             if tour.owner.username == username:
@@ -1145,12 +1147,14 @@ class SubmitFeedback(Mutation):
                 user = UserModel.objects.get(username=get_jwt_identity())
                 if user in tour.users:
                     # assert rating is valid on the 1-5 scale
-                    if rating in range(1, 6):
-                        feedback = TourFeedbackModel(rating=rating, review=review, tour=tour)
-                        feedback.save()
-                        return SubmitFeedback(ok=BooleanField(boolean=True), feedback=feedback)
-                    else:
-                        return SubmitFeedback(ok=BooleanField(boolean=False), feedback=None)
+                    if rating < 1:
+                        rating = 1
+                    elif rating > 5:
+                        rating = 5
+                    feedback = TourFeedbackModel(rating=rating, review=review, tour=tour)
+                    feedback.save()
+                    return SubmitFeedback(ok=BooleanField(boolean=True), feedback=feedback)
+
                 else:
                     return SubmitFeedback(ok=BooleanField(boolean=False), feedback=None)
             else:
