@@ -389,7 +389,7 @@ class RemoveFavouriteObject(Mutation):
         # get the user object to reference
         user = UserModel.objects.get(username=get_jwt_identity())
         # get the user's favourites
-        if FavouritesModel.objects.get(user=user):
+        if FavouritesModel.objects(user=user):
             favourites = FavouritesModel.objects.get(user=user)
             # assert the MuseumObject exists
             if MuseumObjectModel.objects(object_id=object_id):
@@ -480,7 +480,7 @@ class RemoveFavouriteTour(Mutation):
         # get user to reference
         user = UserModel.objects.get(username=get_jwt_identity())
         # get the user's favourites
-        if FavouritesModel.objects.get(user=user):
+        if FavouritesModel.objects(user=user):
             favourites = FavouritesModel.objects.get(user=user)
             # check if tour exists
             if TourModel.objects(id=tour_id):
@@ -601,8 +601,8 @@ class CreatePictureCheckpoint(Mutation):
             tour_id, String, object id of a valid tour
             text, String, optional, text on the checkpoint
             picture_id, String, optional, id of an existing picture in the database to turn into a checkpoint
-            picture, Upload, optional, image in png format to create a checkpoint with a new image
-            picture_description, String, optional, description of the uploaded picture (NOT of the checkpoint)
+            #picture, Upload, optional, image in png format to create a checkpoint with a new image
+            #picture_description, String, optional, description of the uploaded picture (NOT of the checkpoint)
         caller has to be owner of tour
         if successful returns the created checkpoint and True
         if unsuccessful because the tour did not exist or the caller did not own the tour or the picture id was invalid
@@ -613,8 +613,8 @@ class CreatePictureCheckpoint(Mutation):
         token = String(required=True)
         tour_id = String(required=True)
         picture_id = String()
-        picture = Upload()
-        picture_description = String()
+        #picture = Upload()
+        #picture_description = String()
         text = String()
 
     checkpoint = Field(lambda: PictureCheckpoint)
@@ -631,8 +631,8 @@ class CreatePictureCheckpoint(Mutation):
         if not user == tour.owner:
             return CreatePictureCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
         picture_id = kwargs.get('picture_id', None)
-        picture = kwargs.get('picture', None)
-        picture_description = kwargs.get('picture_description', None)
+        #picture = kwargs.get('picture', None)
+        #picture_description = kwargs.get('picture_description', None)
         text = kwargs.get('text', None)
         # add checkpoint to the end of the tour
         current_index = tour.current_checkpoints
@@ -648,10 +648,10 @@ class CreatePictureCheckpoint(Mutation):
                 return CreatePictureCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
             else:
                 return CreatePictureCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
-        if picture is not None:
-            x = PictureModel(description=picture_description)
-            x.picture.put(picture, content_type='image/png')
-            x.save()
+        #if picture is not None:
+            #x = PictureModel(description=picture_description)
+            #x.picture.put(picture, content_type='image/png')
+            #x.save()
             checkpoint = PictureCheckpointModel(picture=x, tour=tour, text=text, index=current_index)
             checkpoint.save()
             return CreatePictureCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))

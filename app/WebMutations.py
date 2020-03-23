@@ -556,10 +556,10 @@ class AcceptReview(Mutation):
 
     class Arguments:
         token = String(required=True)
-        tour = String(required=True)
+        tour_id = String(required=True)
 
     ok = Field(ProtectedBool)
-    tour_id = Field(Tour)
+    tour = Field(Tour)
 
     @classmethod
     @mutation_jwt_required
@@ -570,11 +570,11 @@ class AcceptReview(Mutation):
                 tour.update(set__status='featured')
                 tour.save()
                 tour.reload()
-                return DenyReview(ok=BooleanField(boolean=True), tour=tour)
+                return AcceptReview(ok=BooleanField(boolean=True), tour=tour)
             else:
-                return DenyReview(ok=BooleanField(boolean=False), tour=None)
+                return AcceptReview(ok=BooleanField(boolean=False), tour=None)
         else:
-            return DenyReview(ok=BooleanField(boolean=False), tour=None)
+            return AcceptReview(ok=BooleanField(boolean=False), tour=None)
 
 
 class ReadFeedback(Mutation):
