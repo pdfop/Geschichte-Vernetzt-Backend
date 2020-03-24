@@ -267,7 +267,7 @@ class DeleteAccount(Mutation):
             answers associated with the questions among the checkpoints
             answers given by the user to other questions
             favourites
-        all of this is enforce in data models by the reverse_delete_rule on reference fields
+        all of this is enforced in data models by the reverse_delete_rule on reference fields
        """
 
     class Arguments:
@@ -648,15 +648,14 @@ class CreatePictureCheckpoint(Mutation):
                 checkpoint = PictureCheckpointModel(picture=pic, tour=tour, text=text, index=current_index)
                 checkpoint.save()
                 return CreatePictureCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
-            else:
-                return CreatePictureCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+        return CreatePictureCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
         #if picture is not None:
             #x = PictureModel(description=picture_description)
             #x.picture.put(picture, content_type='image/png')
             #x.save()
-            checkpoint = PictureCheckpointModel(picture=x, tour=tour, text=text, index=current_index)
-            checkpoint.save()
-            return CreatePictureCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+            #checkpoint = PictureCheckpointModel(picture=x, tour=tour, text=text, index=current_index)
+            #checkpoint.save()
+            #return CreatePictureCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
 
 class CreateObjectCheckpoint(Mutation):
@@ -723,21 +722,21 @@ class CreateAnswer(Mutation):
     class Arguments:
         token = String(required=True)
         answer = String(required=True)
-        question = String(required=True)
+        question_id = String(required=True)
 
     answer = Field(lambda: Answer)
     ok = ProtectedBool()
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, answer, question):
+    def mutate(cls, _, info, answer, question_id):
         # get user object to reference
         username = get_jwt_identity()
         if UserModel.objects(username=username):
             user = UserModel.objects.get(username=username)
             # assert question exists
-            if QuestionModel.objects(id=question):
-                question = QuestionModel.objects.get(id=question)
+            if QuestionModel.objects(id=question_id):
+                question = QuestionModel.objects.get(id=question_id)
             else:
                 return CreateAnswer(answer=None, ok=BooleanField(boolean=False))
             # ensure user is member of the tour
@@ -775,7 +774,7 @@ class CreateMCAnswer(Mutation):
     class Arguments:
         token = String(required=True)
         answer = List(of_type=Int, required=True)
-        question = String(required=True)
+        question_id = String(required=True)
 
     answer = Field(lambda: MCAnswer)
     correct = Int()
@@ -783,14 +782,14 @@ class CreateMCAnswer(Mutation):
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, answer, question):
+    def mutate(cls, _, info, answer, question_id):
         # get user object to reference
         username = get_jwt_identity()
         if UserModel.objects(username=username):
             user = UserModel.objects.get(username=username)
             # assert question exists
-            if QuestionModel.objects(id=question):
-                question = MCQuestionModel.objects.get(id=question)
+            if QuestionModel.objects(id=question_id):
+                question = MCQuestionModel.objects.get(id=question_id)
             else:
                 return CreateAnswer(answer=None, ok=BooleanField(boolean=False), correct=0)
             # ensuring user is member of the tour
@@ -1277,6 +1276,142 @@ class DeleteCheckpoint(Mutation):
             return DeleteCheckpoint(ok=BooleanField(boolean=False))
 
 
+class EditCheckpoint(Mutation):
+    """
+        Allows tour owners to edit checkpoints in their tours.
+        Parameters:
+            token, String, required
+            checkpoint_id, String, required, id of the checkpoint to be edited
+            text, String, optional, description text of the checkpoint
+            object_id, optional, object_id of a museum object to update the reference of an ObjectCheckpoint
+            picture_id, optional, id of a Picture to update the reference of a PictureCheckpoint
+            question, String, text to update the question text of a Question or MCQuestion
+            linked_objects, List of String, list of object ids to update the references in a Question or MCQuestion
+            possible_answers, List of String, update the possible answers of a MCQuestion
+            correct_answers, List of Int, update the correct answers of a MCQuestion
+            max_choices, Int, new max choices value for a MCQuestion
+        if successful returns the updated checkpoint and True
+        if unsuccessful because the token was invalid returns emtpy value for ok
+        returns Null and False if unsuccessful because
+            token did not belong to the tour owner
+            checkpoint with checkpoint_id does not exist
+            given a picture_id or object_id or linked_objects and the referenced object did not exist
+
+    """
+
+    class Arguments:
+        token = String(required=True)
+        checkpoint_id = String(required=True)
+        text = String()
+        object_id = String()
+        picture_id = String()
+        question = String()
+        linked_objects = List(String)
+        possible_answers = List(String)
+        correct_answers = List(Int)
+        max_choices = Int()
+
+    checkpoint = Field(lambda: CheckpointUnion)
+    ok = Field(ProtectedBool)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, checkpoint_id, **kwargs):
+        # assert checkpoint exists
+        if not CheckpointModel.objects(id=checkpoint_id):
+            return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+        # get checkpoint object
+        checkpoint = CheckpointModel.objects.get(id=checkpoint_id)
+        # assert caller owns the tour and thus the checkpoint
+        tour = checkpoint.tour
+        user = UserModel.objects.get(username=get_jwt_identity())
+        if user != tour.owner:
+            return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+        # get all the optional arguments
+        text = kwargs.get('text', None)
+        object_id = kwargs.get('object_id', None)
+        picture_id = kwargs.get('picture_id', None)
+        question = kwargs.get('question', None)
+        linked_objects = kwargs.get('linked_objects', None)
+        possible_answers = kwargs.get('possible_answers', None)
+        correct_answers = kwargs.get('correct_answers', None)
+        max_choices = kwargs.get('max_choices', None)
+        # treat checkpoint update depending on the type of the checkpoint
+        if isinstance(checkpoint, ObjectCheckpointModel):
+            # assert new object exists
+            if object_id is not None:
+                if not MuseumObjectModel.objects(object_id=object_id):
+                    return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+                museum_object = MuseumObjectModel.objects.get(object_id=object_id)
+                checkpoint.update(set__museum_object=museum_object)
+                # text may be changed on any checkpoint
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+        elif isinstance(checkpoint, PictureCheckpointModel):
+            # assert new picture exists
+            if picture_id is not None:
+                if not PictureModel.objects(id=picture_id):
+                    return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+                pic = PictureModel.objects.get(id=picture_id)
+                checkpoint.update(set__picture=pic)
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+        # check MCQuestion first because a MCQuestion would pass the check for isinstance(checkpoint,QuestionModel)
+        elif isinstance(checkpoint, MCQuestionModel):
+            # question text is inherited from question
+            if question is not None:
+                checkpoint.update(set__question=question)
+            if possible_answers is not None:
+                checkpoint.update(set__possible_answers=possible_answers)
+            if correct_answers is not None:
+                checkpoint.update(set__correct_answers=correct_answers)
+            if max_choices is not None:
+                checkpoint.update(set__max_choices=max_choices)
+            # linked objects are also inherited from question
+            if linked_objects is not None:
+                new_links = []
+                for oid in linked_objects:
+                    if not MuseumObjectModel.objects(object_id=oid):
+                        return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+                    else:
+                        new_links.append(MuseumObjectModel.objects.get(object_id=oid))
+                checkpoint.update(set__linked_objects=new_links)
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+        elif isinstance(checkpoint, QuestionModel):
+            if question is not None:
+                checkpoint.update(set__question=question)
+            if linked_objects is not None:
+                new_links = []
+                for oid in linked_objects:
+                    if not MuseumObjectModel.objects(object_id=oid):
+                        return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
+                    else:
+                        new_links.append(MuseumObjectModel.objects.get(object_id=oid))
+                checkpoint.update(set__linked_objects=new_links)
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+        # last remaining option is a basic text checkpoint
+        else:
+            if text is not None:
+                checkpoint.update(set__text=text)
+            checkpoint.save()
+            checkpoint.reload()
+            return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
+
+
 # TODO: to be removed, does nothing
 class FileUpload(Mutation):
     class Arguments:
@@ -1319,6 +1454,7 @@ class Mutation(ObjectType):
     create_checkpoint = CreateCheckpoint.Field()
     create_picture_checkpoint = CreatePictureCheckpoint.Field()
     create_object_checkpoint = CreateObjectCheckpoint.Field()
+    edit_checkpoint = EditCheckpoint.Field()
     move_checkpoint = MoveCheckpoint.Field()
     delete_checkpoint = DeleteCheckpoint.Field()
 

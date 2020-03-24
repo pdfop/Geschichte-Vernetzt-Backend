@@ -1,5 +1,5 @@
 from flask_graphql_auth import get_jwt_identity, query_jwt_required
-from graphene import ObjectType, List, String, Field
+from graphene import ObjectType, List, String, Field, Int
 from app.Fields import User, Favourites, Tour, MuseumObject, Answer, TourFeedback, Question, Checkpoint, CheckpointUnion
 from models.User import User as UserModel
 from models.Tour import Tour as TourModel
@@ -153,6 +153,7 @@ class Query(ObjectType):
 
     # master query for objects
 
+    all_objects = List(MuseumObject, token=String())
     museum_object = List(MuseumObject, object_id=String(),
                          category=String(),
                          sub_category=String(),
@@ -162,11 +163,21 @@ class Query(ObjectType):
                          art_type=String(),
                          creator=String(),
                          material=String(),
-                         size=String(),
+                         time_range=String(),
                          location=String(),
                          description=String(),
-                         interdisciplinary_context=String())
-    all_objects = List(MuseumObject, token=String())
+                         interdisciplinary_context=String(),
+                         additional_information=String(),
+                         height=Int(),
+                         width=Int(),
+                         length=Int(),
+                         diameter=Int())
+
+
+    @classmethod
+    @query_jwt_required
+    def resolve_all_objects(cls, _, info):
+        return MuseumObjectModel.objects.all()
 
     @classmethod
     @query_jwt_required
@@ -176,44 +187,52 @@ class Query(ObjectType):
         sub_category = kwargs.get('sub_category', None)
         title = kwargs.get('title', None)
         year = kwargs.get('year', None)
-        picture = kwargs.get('picture', None)
         art_type = kwargs.get('art_type', None)
         creator = kwargs.get('creator', None)
         material = kwargs.get('material', None)
-        size = kwargs.get('size', None)
         location = kwargs.get('location', None)
         description = kwargs.get('description', None)
         interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
+        time_range = kwargs.get('time_range', None)
+        additional_information = kwargs.get('additional_information', None)
+        height = kwargs.get('height', None)
+        length = kwargs.get('length', None)
+        width = kwargs.get('width', None)
+        diameter = kwargs.get('diameter', None)
+
         result = MuseumObjectModel.objects.all()
         if object_id is not None:
             result = result(object_id=object_id)
         if category is not None:
             result = result(category=category)
         if sub_category is not None:
-            result = result(sub_category)
+            result = result(sub_category=sub_category)
         if title is not None:
             result = result(title=title)
-        if year is not None :
+        if year is not None:
             result = result(year__contains=year)
-        if picture is not None:
-            result = result(picture__contains=picture)
         if art_type is not None:
             result = result(art_type__contains=art_type)
         if creator is not None:
             result = result(creator__contains=creator)
         if material is not None:
             result = result(material__contains=material)
-        if size is not None:
-            result = result(size=size)
+        if time_range is not None:
+            result = result(size=time_range)
         if location is not None:
             result = result(location__contains=location)
         if description is not None:
             result = result(description=description)
         if interdisciplinary_context is not None:
             result = result(interdisciplinary_context=interdisciplinary_context)
+        if additional_information is not None:
+            result = result(additional_information=additional_information)
+        if height is not None:
+            result = result(size__height=height)
+        if length is not None:
+            result = result(size__length=length)
+        if width is not None:
+            result = result(size__width=width)
+        if diameter is not None:
+            result = result(size__diameter=diameter)
         return list(result)
-
-    @classmethod
-    @query_jwt_required
-    def resolve_all_objects(cls, _, info):
-        return MuseumObjectModel.objects.all()

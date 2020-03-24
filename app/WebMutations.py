@@ -24,7 +24,7 @@ import string
 import random
 from app.ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
 from app.Fields import Tour, MuseumObject, Admin, User, Picture, Badge, Checkpoint, PictureCheckpoint, \
-    ObjectCheckpoint, Question, MCAnswer, Answer, MCQuestion, CheckpointUnion
+    ObjectCheckpoint, Question, MCAnswer, Answer, MCQuestion, CheckpointUnion, ProfilePicture
 
 """
 These are the mutations available in the web portal 
@@ -148,7 +148,7 @@ class UpdateMuseumObject(Mutation):
                     subCategory, String, optional, sub-category of the object in the museum. 'Sammlungsbereich'
                     title, String, optional, name of the object
                     year, List of Strings, optional, year the object was created/found
-                    picture, List of Upload, optional, pictures in png format
+                    picture, List of String, optional, document ids of existing Picture objects in the database
                     art_type, List of Strings, optional, classification of the object e.g. 'painting'
                     creator, List of Strings, optional, creators of the object
                     material, List of Strings, optional, materials the object is made of
@@ -160,8 +160,10 @@ class UpdateMuseumObject(Mutation):
                     description, optional, String, optional, description of the object
                     interdisciplinary_context, String, optional, interdisciplinary relations of the object
         returns the updated object and True if successful
-        returns Null and False if token did not belong to admin or object with that id does not exist
-        returns Null and an empty value for ok if token was invalid """
+        returns Null and False if token did not belong to admin or object with that id does not exist or a picture id
+            was invalid.
+        returns Null and an empty value for ok if token was invalid
+    """
 
     class Arguments:
         object_id = String(required=True)
@@ -171,7 +173,7 @@ class UpdateMuseumObject(Mutation):
         time_range = String()
         title = String()
         year = List(String)
-        picture = List(Upload)
+        picture = List(String)
         art_type = List(String)
         creator = List(String)
         material = List(String)
@@ -223,11 +225,12 @@ class UpdateMuseumObject(Mutation):
                     museum_object.update(set__year=year)
                 if picture is not None:
                     pics = []
-                    for pic in picture:
-                        x = PictureModel()
-                        x.picture.put(pic, content_type='image/png')
-                        x.save()
-                        pics.append(x)
+                    for pid in picture:
+                        if PictureModel.objects(id=pid):
+                            pic = PictureModel.objects.get(id=pid)
+                            pics.append(pic)
+                        else:
+                            return UpdateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
                     museum_object.update(set__picture=pics)
                 if art_type is not None:
                     museum_object.update(set__art_type=art_type)
@@ -256,7 +259,6 @@ class UpdateMuseumObject(Mutation):
                     museum_object.update(set__interdisciplinary_context=interdisciplinary_context)
                 museum_object.save()
                 museum_object.reload()
-
                 return UpdateMuseumObject(ok=BooleanField(boolean=True), museum_object=museum_object)
         else:
             return UpdateMuseumObject(ok=BooleanField(boolean=False), museum_object=None)
@@ -479,7 +481,13 @@ class DeleteUser(Mutation):
         returns False if token does not have the admin claim
         returns empty value if token was invalid
         successful if the user does not exist
-        deletes all answers, tours, questions and favourites of the user
+       NOTE: also deletes the user's:
+            owned tours
+            checkpoints associated with the tours
+            answers associated with the questions among the checkpoints
+            answers given by the user to other questions
+            favourites
+        all of this is enforced in data models by the reverse_delete_rule on reference fields
     """
 
     class Arguments:
@@ -494,16 +502,6 @@ class DeleteUser(Mutation):
         if get_jwt_claims() == admin_claim:
             if UserModel.objects(username=username):
                 user = UserModel.objects.get(username=username)
-                tours = TourModel.objects(owner=user)
-                for tour in tours:
-                    for question in tour.questions:
-                        question.delete()
-                    for answer in tour.answers:
-                        answer.delete()
-                    tour.delete()
-                answers = AnswerModel.objects(owner=user)
-                for answer in answers:
-                    answer.delete()
                 user.delete()
             return DeleteUser(ok=BooleanField(boolean=True))
 
@@ -585,22 +583,23 @@ class ReadFeedback(Mutation):
         returns False if token does not have admin claim or feedback object does not exist
         returns empty value if token was invalid
         sets the feedback's read field to True
-        works on feedback that has already been read """
+        works on feedback that has already been read
+    """
 
     class Arguments:
         token = String(required=True)
-        feedback = String(required=True)
+        feedback_id = String(required=True)
 
     ok = Field(ProtectedBool)
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, feedback):
+    def mutate(cls, _, info, feedback_id):
         if get_jwt_claims() == admin_claim:
-            if not AppFeedbackModel.objects(id=feedback):
+            if not AppFeedbackModel.objects(id=feedback_id):
                 return ReadFeedback(ok=BooleanField(boolean=False))
             else:
-                feedback = AppFeedbackModel.objects.get(id=feedback)
+                feedback = AppFeedbackModel.objects.get(id=feedback_id)
                 feedback.update(set__read=True)
                 feedback.save()
                 return ReadFeedback(ok=BooleanField(boolean=True))
@@ -674,16 +673,17 @@ class CreateProfilePicture(Mutation):
         picture = Upload(required=True)
 
     ok = Field(ProtectedBool)
+    picture = Field(lambda: ProfilePicture)
 
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, picture):
         if not get_jwt_claims() == admin_claim:
-            return CreateProfilePicture(ok=BooleanField(boolean=False))
+            return CreateProfilePicture(ok=BooleanField(boolean=False), picture=None)
         pic = ProfilePictureModel()
         pic.picture.put(picture, content_type='image/png')
         pic.save()
-        return CreateProfilePicture(ok=BooleanField(boolean=True))
+        return CreateProfilePicture(ok=BooleanField(boolean=True), picture=pic)
 
 
 class CreatePicture(Mutation):
@@ -693,16 +693,17 @@ class CreatePicture(Mutation):
         description = String()
 
     ok = Field(ProtectedBool)
+    picture = Field(lambda: Picture)
 
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, picture, description=None):
         if not get_jwt_claims() == admin_claim:
-            return CreatePicture(ok=BooleanField(boolean=False))
+            return CreatePicture(ok=BooleanField(boolean=False), picture=None)
         pic = PictureModel(description=description)
         pic.picture.put(picture, content_type='image/png')
         pic.save()
-        return CreatePicture(ok=BooleanField(boolean=True))
+        return CreatePicture(ok=BooleanField(boolean=True), picture=pic)
 
 
 class UpdateBadge(Mutation):
@@ -833,7 +834,7 @@ class UpdateProfilePicture(Mutation):
         picture = Upload()
 
     ok = Field(ProtectedBool)
-    picture = Field(lambda: Picture)
+    picture = Field(lambda: ProfilePicture)
 
     @classmethod
     @mutation_jwt_required
@@ -984,7 +985,7 @@ class EditCheckpoint(Mutation):
 
 
 class Mutation(ObjectType):
-    create_user = CreateAdmin.Field()
+    create_admin = CreateAdmin.Field()
     auth = Auth.Field()
     refresh = Refresh.Field()
     change_password = ChangePassword.Field()

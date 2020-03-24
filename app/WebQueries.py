@@ -30,10 +30,17 @@ class Query(ObjectType):
                          art_type=String(),
                          creator=String(),
                          material=String(),
-                         size=String(),
+                         time_range=String(),
                          location=String(),
                          description=String(),
-                         interdisciplinary_context=String())
+                         interdisciplinary_context=String(),
+                         additional_information=String(),
+                         height=Int(),
+                         width=Int(),
+                         length=Int(),
+                         diameter=Int())
+
+
 
     @classmethod
     @query_jwt_required
@@ -104,10 +111,16 @@ class Query(ObjectType):
         art_type = kwargs.get('art_type', None)
         creator = kwargs.get('creator', None)
         material = kwargs.get('material', None)
-        size = kwargs.get('size', None)
         location = kwargs.get('location', None)
         description = kwargs.get('description', None)
         interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
+        time_range = kwargs.get('time_range', None)
+        additional_information = kwargs.get('additional_information', None)
+        height = kwargs.get('height', None)
+        length = kwargs.get('length', None)
+        width = kwargs.get('width', None)
+        diameter = kwargs.get('diameter', None)
+
         result = MuseumObjectModel.objects.all()
         if object_id is not None:
             result = result(object_id=object_id)
@@ -125,14 +138,24 @@ class Query(ObjectType):
             result = result(creator__contains=creator)
         if material is not None:
             result = result(material__contains=material)
-        if size is not None:
-            result = result(size=size)
+        if time_range is not None:
+            result = result(size=time_range)
         if location is not None:
             result = result(location__contains=location)
         if description is not None:
             result = result(description=description)
         if interdisciplinary_context is not None:
             result = result(interdisciplinary_context=interdisciplinary_context)
+        if additional_information is not None:
+            result = result(additional_information=additional_information)
+        if height is not None:
+            result = result(size__height=height)
+        if length is not None:
+            result = result(size__length=length)
+        if width is not None:
+            result = result(size__width=width)
+        if diameter is not None:
+            result = result(size__diameter=diameter)
         return list(result)
 
     @classmethod

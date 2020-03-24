@@ -17,6 +17,7 @@ from models.MultipleChoiceAnswer import MultipleChoiceAnswer as MCAnswerModel
 from models.MultipleChoiceQuestion import MultipleChoiceQuestion as MCQuestionModel
 from models.PictureCheckpoint import PictureCheckpoint as PictureCheckpointModel
 from models.ObjectCheckpoint import ObjectCheckpoint as ObjectCheckpointModel
+from models.ProfilePicture import ProfilePicture as ProfilePictureModel
 """
     This file contains the models used in GraphQL. 
     A model for a type is only needed when it is returned by a GraphQL function.  
@@ -86,6 +87,11 @@ class Favourites(MongoengineObjectType):
 class Picture(MongoengineObjectType):
     class Meta:
         model = PictureModel
+
+
+class ProfilePicture(MongoengineObjectType):
+    class Meta:
+        model = ProfilePictureModel
 
 
 class Badge(MongoengineObjectType):
