@@ -198,7 +198,7 @@ class ChangeUsername(Mutation):
     def mutate(cls, _, info, username):
         if UserModel.objects(username=username):
             return ChangeUsername(ok=BooleanField(boolean=False), user=None)
-        user = UserModel.objects.get(get_jwt_identity())
+        user = UserModel.objects.get(username=get_jwt_identity())
         user.update(set__username=username)
         user.save()
         user.reload()
