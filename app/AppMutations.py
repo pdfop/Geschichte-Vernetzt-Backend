@@ -14,7 +14,6 @@ from models.Favourites import Favourites as FavouritesModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.AppFeedback import AppFeedback as AppFeedbackModel
 from models.TourFeedback import TourFeedback as TourFeedbackModel
-from graphene_file_upload.scalars import Upload
 from models.Picture import Picture as PictureModel
 from models.Badge import Badge as BadgeModel
 from models.MultipleChoiceQuestion import MultipleChoiceQuestion as MCQuestionModel
@@ -175,6 +174,35 @@ class ChangePassword(Mutation):
         user.update(set__password=generate_password_hash(password))
         user.save()
         return ChangePassword(ok=BooleanField(boolean=True))
+
+
+class ChangeUsername(Mutation):
+    """
+        Change the account name of the current user. New username also has to be unique.
+        Parameters:
+            token: String, jwt access token
+            username: String, new user name
+        returns the updated user and True if successful
+        returns Null and False if username already exists
+        returns empty value for ok if token is invalid
+    """
+    class Arguments:
+        token = String(required=True)
+        username = String(required=True)
+
+    ok = Field(ProtectedBool)
+    user = Field(lambda: User)
+
+    @classmethod
+    @mutation_jwt_required
+    def mutate(cls, _, info, username):
+        if UserModel.objects(username=username):
+            return ChangeUsername(ok=BooleanField(boolean=False), user=None)
+        user = UserModel.objects.get(get_jwt_identity())
+        user.update(set__username=username)
+        user.save()
+        user.reload()
+        return ChangeUsername(user=user, ok=BooleanField(boolean=True))
 
 
 class Auth(Mutation):
@@ -955,19 +983,20 @@ class AddMember(Mutation):
     class Arguments:
         tour_id = String(required=True)
         token = String(required=True)
-        session_id = Int(required=True)
+        session_id = Int()
 
     ok = Field(ProtectedBool)
     tour = Field(lambda: Tour)
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, tour_id, session_id):
+    def mutate(cls, _, info, tour_id, **kwargs):
         # assert tour exists
         if TourModel.objects(id=tour_id):
             tour = TourModel.objects.get(id=tour_id)
             # assert the provided session id is valid for the tour
-            if tour.session_id == session_id:
+            session_id = kwargs.get('session_id', None)
+            if tour.session_id == session_id or tour.status == 'featured':
                 username = get_jwt_identity()
                 # get user object to reference in the users list of the tour
                 if UserModel.objects(username=username):
@@ -1412,20 +1441,6 @@ class EditCheckpoint(Mutation):
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
 
-# TODO: to be removed, does nothing
-class FileUpload(Mutation):
-    class Arguments:
-        file = Upload(required=True)
-
-    success = Boolean()
-
-    def mutate(self, info, file, **kwargs):
-        pic = PictureModel(description='gqql')
-        pic.picture.put(file, content_type='image/png')
-        pic.save()
-        return FileUpload(success=True)
-
-
 class Mutation(ObjectType):
     create_user = CreateUser.Field()
     auth = Auth.Field()
@@ -1448,7 +1463,6 @@ class Mutation(ObjectType):
     update_session_id = UpdateSessionId.Field()
     remove_user = RemoveUser.Field()
     submit_tour_feedback = SubmitFeedback.Field()
-    file_upload = FileUpload.Field()
     add_badge_progress = AddBadgeProgress.Field()
     choose_profile_picture = ChooseProfilePicture.Field()
     create_checkpoint = CreateCheckpoint.Field()
@@ -1457,4 +1471,4 @@ class Mutation(ObjectType):
     edit_checkpoint = EditCheckpoint.Field()
     move_checkpoint = MoveCheckpoint.Field()
     delete_checkpoint = DeleteCheckpoint.Field()
-
+    change_username = ChangeUsername.Field()

@@ -1,6 +1,6 @@
 from flask_graphql_auth import query_jwt_required, get_jwt_claims
 from graphene import ObjectType, List, String, Field, Boolean, Int
-from app.Fields import Tour, MuseumObject, Code, AppFeedback, TourFeedback, Checkpoint, CheckpointUnion
+from app.Fields import Tour, MuseumObject, Code, AppFeedback, TourFeedback, Checkpoint, CheckpointUnion, User
 from models.AppFeedback import AppFeedback as AppFeedbackModel
 from models.Tour import Tour as TourModel
 from models.Code import Code as CodeModel
@@ -39,7 +39,6 @@ class Query(ObjectType):
                          width=Int(),
                          length=Int(),
                          diameter=Int())
-
 
 
     @classmethod
@@ -180,3 +179,4 @@ class Query(ObjectType):
     @query_jwt_required
     def resolve_all_objects(cls, _, info):
         return MuseumObjectModel.objects.all()
+

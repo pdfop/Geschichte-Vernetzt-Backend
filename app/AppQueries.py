@@ -1,6 +1,7 @@
 from flask_graphql_auth import get_jwt_identity, query_jwt_required
 from graphene import ObjectType, List, String, Field, Int
-from app.Fields import User, Favourites, Tour, MuseumObject, Answer, TourFeedback, Question, Checkpoint, CheckpointUnion
+from app.Fields import User, Favourites, Tour, MuseumObject, Answer, TourFeedback, Question, Checkpoint, \
+    CheckpointUnion, ProfilePicture
 from models.User import User as UserModel
 from models.Tour import Tour as TourModel
 from models.Answer import Answer as AnswerModel
@@ -9,6 +10,7 @@ from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.TourFeedback import TourFeedback as TourFeedbackModel
 from models.Question import Question as QuestionModel
 from models.Checkpoint import Checkpoint as CheckpointModel
+from models.ProfilePicture import ProfilePicture as ProfilePictureModel
 
 """
     These are the queries available to the App API. 
@@ -74,6 +76,13 @@ class Query(ObjectType):
     tour_search_id = List(String, token=String(), search_id=String())
     """returns a single checkpoint by id"""
     checkpoint_id = List(CheckpointUnion, token=String(), checkpoint_id=String())
+    """returns all featured tours"""
+    featured = List(Tour, token=String())
+
+    @classmethod
+    @query_jwt_required
+    def resolve_featured(cls, _, info):
+        return list(TourModel.objects(status='featured'))
 
     @classmethod
     @query_jwt_required
@@ -132,8 +141,8 @@ class Query(ObjectType):
     @query_jwt_required
     def resolve_tour_search_id(cls, _, info, search_id):
         """ NOTE: This only returns the tour id, not the tour object.
-        The id can be used in combination with the session id to join the tour. Users that are a member of a tour can use
-         the id of the tour to get the tour object which allows for further retrieval of tour fields and checkpoints.
+        The id can be used in combination with the session id to join the tour. Users that are a member of a tour can
+         use the id of the tour to get the tour object which allows for further retrieval of tour fields and checkpoints
          """
         if TourModel.objects(search_id=search_id):
             tour = TourModel.objects.get(search_id=search_id)
@@ -172,7 +181,6 @@ class Query(ObjectType):
                          width=Int(),
                          length=Int(),
                          diameter=Int())
-
 
     @classmethod
     @query_jwt_required
@@ -236,3 +244,35 @@ class Query(ObjectType):
         if diameter is not None:
             result = result(size__diameter=diameter)
         return list(result)
+
+    """ returns the current user as object allowing to query e.g. the profile picture id"""
+    me = List(User, token=String())
+    """ returns the id of the profile picture of a given username. picture can then be loaded by calling the 
+        file/download function with type='ProfilePicture' and id= the id returned by this 
+    """
+    profile_picture = List(String, token=String(), username=String())
+    """ returns the ids of all possible profile pictures """
+    available_profile_pictures = List(String, token=String())
+
+    @classmethod
+    @query_jwt_required
+    def resolve_available_profile_pictures(cls, _, info):
+        ids = []
+        for pic in ProfilePictureModel.objects.all():
+            ids.append(pic.id)
+        return ids
+
+    @classmethod
+    @query_jwt_required
+    def resolve_me(cls, _, info):
+        return list(UserModel.objects.get(username=get_jwt_identity()))
+
+    @classmethod
+    @query_jwt_required
+    def resolve_profile_picture(cls, _, info, username):
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            pic_id = user.profile_picture.id
+            return [pic_id]
+        return []
+

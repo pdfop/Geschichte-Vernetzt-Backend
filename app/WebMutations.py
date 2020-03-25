@@ -1,6 +1,6 @@
 from flask_graphql_auth import create_access_token, create_refresh_token, mutation_jwt_refresh_token_required, \
     get_jwt_identity, mutation_jwt_required, get_jwt_claims
-from graphene import ObjectType, Schema, List, Mutation, String, Field, Boolean, Int
+from graphene import ObjectType, List, Mutation, String, Field, Boolean, Int
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.Admin import Admin as AdminModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
@@ -9,7 +9,6 @@ from models.User import User as UserModel
 from models.Tour import Tour as TourModel
 from models.Question import Question as QuestionModel
 from models.AppFeedback import AppFeedback as AppFeedbackModel
-from models.Answer import Answer as AnswerModel
 from models.Favourites import Favourites as FavouritesModel
 from models.Badge import Badge as BadgeModel
 from models.Picture import Picture as PictureModel
@@ -18,13 +17,11 @@ from models.Checkpoint import Checkpoint as CheckpointModel
 from models.PictureCheckpoint import PictureCheckpoint as PictureCheckpointModel
 from models.ObjectCheckpoint import ObjectCheckpoint as ObjectCheckpointModel
 from models.MultipleChoiceQuestion import MultipleChoiceQuestion as MCQuestionModel
-from models.MultipleChoiceAnswer import MultipleChoiceAnswer as MCAnswerModel
 from graphene_file_upload.scalars import Upload
 import string
 import random
 from app.ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
-from app.Fields import Tour, MuseumObject, Admin, User, Picture, Badge, Checkpoint, PictureCheckpoint, \
-    ObjectCheckpoint, Question, MCAnswer, Answer, MCQuestion, CheckpointUnion, ProfilePicture
+from app.Fields import Tour, MuseumObject, Admin, User, Picture, Badge, CheckpointUnion, ProfilePicture
 
 """
 These are the mutations available in the web portal 
@@ -312,21 +309,41 @@ class DeleteMuseumObject(Mutation):
             if MuseumObjectModel.objects(object_id=object_id):
                 museum_object = MuseumObjectModel.objects.get(object_id=object_id)
                 pictures = museum_object.picture
+                # delete associated pictures
                 for picture in pictures:
                     picture.delete()
-                favourites = FavouritesModel.objects(contains__favouvite_objects=museum_object)
+                # delete object from user favourites
+                favourites = FavouritesModel.objects(favourite_objects__contains=museum_object)
                 for favourite in favourites:
                     objects = favourite.favourite_objects
                     objects.remove(museum_object)
                     favourite.update(set__favourite_objects=objects)
                     favourite.save()
-                questions = QuestionModel.objects(contains__linked_objects=museum_object)
+                # delete object reference from questions
+                questions = QuestionModel.objects(linked_objects__contains=museum_object)
                 for question in questions:
                     linked = question.linked_objects
                     linked.remove(museum_object)
                     question.update(set__linked_objects=linked)
+                # delete checkpoints that reference the object
                 checkpoints = ObjectCheckpointModel.objects(museum_object=museum_object)
                 for checkpoint in checkpoints:
+                    # update tour accordingly
+                    tour = checkpoint.tour
+                    max_idx = tour.current_checkpoints
+                    max_idx -= 1
+                    # reduce number of current checkpoints
+                    tour.update(set__current_checkpoints=max_idx)
+                    tour.save()
+                    index = checkpoint.index
+                    tour_checkpoints = CheckpointModel.objects(tour=tour)
+                    # adjust index of later checkpoints in the tour
+                    for cp in tour_checkpoints:
+                        if cp.index > index:
+                            cpidx = cp.index
+                            cpidx -= 1
+                            cp.update(set__index=cpidx)
+                            cp.save()
                     checkpoint.delete()
                 museum_object.delete()
             return DeleteMuseumObject(ok=BooleanField(boolean=True))
