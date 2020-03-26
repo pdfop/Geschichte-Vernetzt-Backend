@@ -15,3 +15,6 @@ class Checkpoint(Document):
     # TODO: find a way to enforce uniqueness with a reference (tour)
     #       seems rather complicated to do in the model, maybe just enforce it when building the tour
     index = IntField(default=0)
+    show_text = BooleanField(default=False)
+    show_picture = BooleanField(default=False)
+    show_details = BooleanField(default=False)

@@ -706,13 +706,22 @@ class CreateObjectCheckpoint(Mutation):
         tour_id = String(required=True)
         object_id = String(required=True)
         text = String()
+        show_text = Boolean()
+        show_picture = Boolean()
+        show_details = Boolean()
+
 
     ok = Field(ProtectedBool)
     checkpoint = Field(lambda: ObjectCheckpoint)
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, tour_id, object_id, text=None):
+    def mutate(cls, _, info, tour_id, object_id, **kwargs):
+        # get optional arguments
+        text = kwargs.get('text', None)
+        show_text = kwargs.get('show_text', False)
+        show_picture = kwargs.get('show_picture', False)
+        show_details = kwargs.get('show_details', False)
         if TourModel.objects(id=tour_id):
             tour = TourModel.objects.get(id=tour_id)
         else:
@@ -729,7 +738,8 @@ class CreateObjectCheckpoint(Mutation):
         tour.save()
         tour.reload()
         museum_object = MuseumObjectModel.objects.get(object_id=object_id)
-        checkpoint = ObjectCheckpointModel(tour=tour, museum_object=museum_object, text=text, index=current_index)
+        checkpoint = ObjectCheckpointModel(tour=tour, museum_object=museum_object, text=text, index=current_index,
+                                           show_details=show_details, show_picture=show_picture, show_text=show_text)
         checkpoint.save()
         return CreateObjectCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
@@ -861,13 +871,24 @@ class CreateQuestion(Mutation):
         linked_objects = List(of_type=String)
         question_text = String(required=True)
         tour_id = String(required=True)
+        text = String()
+        show_text = Boolean()
+        show_picture = Boolean()
+        show_details = Boolean()
 
     question = Field(lambda: Question)
     ok = ProtectedBool()
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, question_text, tour_id, linked_objects=[]):
+    def mutate(cls, _, info, question_text, tour_id, **kwargs):
+        # get optional arguments
+        linked_objects = kwargs.get('linked_objects', None)
+        show_text = kwargs.get('show_text', False)
+        show_picture = kwargs.get('show_picture', False)
+        show_details = kwargs.get('show_details', False)
+        if linked_objects is None:
+            linked_objects = []
         # get the current user object to check for permissions
         username = get_jwt_identity()
         if UserModel.objects(username=username):
@@ -894,7 +915,8 @@ class CreateQuestion(Mutation):
                     tour.save()
                     tour.reload()
                     question = QuestionModel(linked_objects=links,
-                                             question=question_text, tour=tour, index=current_index)
+                                             question=question_text, tour=tour, index=current_index,
+                                             show_details=show_details, show_picture=show_picture, show_text=show_text)
                     question.save()
                     return CreateQuestion(question=question,
                                           ok=BooleanField(boolean=True))
@@ -928,13 +950,21 @@ class CreateMCQuestion(Mutation):
         correct_answers = List(of_type=Int, required=True)
         max_choices = Int(required=True)
         tour_id = String(required=True)
+        show_text = Boolean()
+        show_picture = Boolean()
+        show_details = Boolean()
 
     question = Field(lambda: MCQuestion)
     ok = ProtectedBool()
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, question_text, possible_answers, correct_answers, max_choices, tour_id, linked_objects=[]):
+    def mutate(cls, _, info, question_text, possible_answers, correct_answers, max_choices, tour_id, **kwargs):
+        # get optional arguments
+        linked_objects = kwargs.get('linked_objects', None)
+        show_text = kwargs.get('show_text', False)
+        show_picture = kwargs.get('show_picture', False)
+        show_details = kwargs.get('show_details', False)
         # get the current user object to check for permissions
         username = get_jwt_identity()
         if UserModel.objects(username=username):
@@ -962,7 +992,8 @@ class CreateMCQuestion(Mutation):
                     question = MCQuestionModel(linked_objects=links,
                                                question=question_text, possible_answers=possible_answers,
                                                correct_answers=correct_answers, max_choices=max_choices, tour=tour,
-                                               index=current_index)
+                                               index=current_index, show_text=show_text, show_picture=show_picture,
+                                               show_details=show_details)
                     question.save()
                     return CreateMCQuestion(question=question,
                                             ok=BooleanField(boolean=True))
