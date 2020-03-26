@@ -7,5 +7,5 @@ class Picture(Document):
     """
     meta = {'db_alias': 'file',
             'collection': 'picture'}
-    picture = FileField(content_type='image/png')
+    picture = FileField(content_type='image/jpeg')
     description = StringField()

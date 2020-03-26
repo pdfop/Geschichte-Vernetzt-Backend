@@ -1,6 +1,5 @@
 import io
 from flask import Blueprint, send_file, request, jsonify
-
 from app.WebMutations import admin_claim
 from models.Answer import Answer
 from models.Checkpoint import Checkpoint
@@ -22,7 +21,7 @@ def download():
     Parameters:
         type, String, the DocumentType of the object the picture is taken from. May be Picture, ProfilePicture or Badge
         id, String, the DocumentId of the document that contains the picture in the database
-     if successful returns the image as attachment as id.png
+     if successful returns the image as attachment as id.jpeg or id.png for badges
      returns "invalid type or ID" if the given type was not among the options or and object with the ID did not exist
      NOTE requires a jwt access token in a Authorization header with value: Bearer <token>
     """
@@ -37,16 +36,16 @@ def download():
             raw = pic.picture.read()
             # converting bytes to image and sending it
             return send_file(io.BytesIO(raw),
-                             attachment_filename=str(id) + '.png',
-                             mimetype='image/png')
+                             attachment_filename=str(id) + '.jpeg',
+                             mimetype='image/jpeg')
     # handling for other types is the same as for Picture
     elif type == 'ProfilePicture':
         if ProfilePicture.objects(id=id):
             pic = ProfilePicture.objects.get(id=id)
             raw = pic.picture.read()
             return send_file(io.BytesIO(raw),
-                             attachment_filename=str(id) + '.png',
-                             mimetype='image/png')
+                             attachment_filename=str(id) + '.jpeg',
+                             mimetype='image/jpeg')
 
     elif type == 'Badge':
         if Badge.objects(id=id):
@@ -81,14 +80,14 @@ def upload():
         description = request.args.get('description', default=None)
         pic = Picture(description=description)
         f = request.files['file']
-        pic.picture.put(f, content_type='image/png')
+        pic.picture.put(f, content_type='image/jpeg')
         pic.save()
         return str(pic.id)
     # creates a new ProfilePicture in the database
     elif type == 'ProfilePicture':
         pic = ProfilePicture()
         f = request.files['file']
-        pic.picture.put(f, content_type='image/png')
+        pic.picture.put(f, content_type='image/jpeg')
         pic.save()
         return str(pic.id)
     # creates a new Badge in the database
@@ -106,6 +105,7 @@ def upload():
         return str(id)
     else:
         return jsonify({"Error": "Invalid type"})
+
 
 # TODO: make this produce pdf
 @fileBP.route('/questionpdf', methods=['GET'])

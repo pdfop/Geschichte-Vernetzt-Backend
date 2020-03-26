@@ -13,15 +13,15 @@ class MuseumObject(Document):
             'collection': 'object'}
     title = StringField(required=True)
     time_range = StringField()
-    year = ListField(StringField())
+    year = StringField()
     picture = ListField(ReferenceField(document_type=Picture, reverse_delete_rule=PULL))
-    art_type = ListField(StringField())
-    creator = ListField(StringField())
-    material = ListField(StringField())
-    size = DictField(default={'height': 0, 'width': 0, 'length': 0, 'diameter': 0})
-    location = ListField(StringField())
+    art_type = StringField()
+    creator = StringField()
+    material = StringField()
+    size_ = StringField()
+    location = StringField()
     description = StringField()
     additional_information = StringField()
-    interdisciplinary_context = ListField(StringField())
+    interdisciplinary_context = StringField()
 
 

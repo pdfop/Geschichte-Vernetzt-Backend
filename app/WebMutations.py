@@ -51,19 +51,16 @@ class CreateMuseumObject(Mutation):
                     category, String, required, category of the object in the museum. 'Abteilung'
                     subCategory, String, required, sub-category of the object in the museum. 'Sammlungsbereich'
                     title, String, required, name of the object
-                    year, List of Strings, optional, year the object was created/found
-                    picture, List of Upload, optional,  images in png format
-                    art_type, List of Strings, optional, classification of the object e.g. 'painting'
-                    creator, List of Strings, optional, creators of the object
-                    material, List of Strings, optional, materials the object is made of
-                    width, Int, optional, width of the object in centimeters
-                    height, Int, optional, height of the object in centimeters
-                    length, Int, optional, length of the object in centimeters
-                    diameter, optional, Int, diameter of the object in centimeters
-                    location, optional, List of Strings, optional, locations the object was made/found at
+                    year, String, optional, year the object was created/found
+                    picture, List of Upload, optional,  images in jpeg format
+                    art_type, String, optional, classification of the object e.g. 'painting'
+                    creator, String, optional, creators of the object
+                    material, String, optional, materials the object is made of
+                    size, String, information about the size of the object
+                    location, String, optional, locations the object was made/found at
                     description, String, optional, description of the object
                     additionalInformation, String, optional, any additional information about the object
-                    interdisciplinary_context, List of String, optional, interdisciplinary relations of the object
+                    interdisciplinary_context, String, optional, interdisciplinary relations of the object
         returns the object and True if successful
         returns Null and False if token did not belong to admin or object with that id already existed
         returns Null and an empty value for ok if token was invalid """
@@ -75,19 +72,16 @@ class CreateMuseumObject(Mutation):
         title = String(required=True)
         token = String(required=True)
         time_range = String()
-        year = List(String)
+        year = String()
         picture = List(Upload)
-        art_type = List(String)
-        creator = List(String)
-        material = List(String)
-        width = Int()
-        height = Int()
-        length = Int()
-        diameter = Int()
-        location = List(String)
+        art_type = String()
+        creator = String()
+        material = String()
+        size = String()
+        location = String()
         description = String()
         additional_information = String()
-        interdisciplinary_context = List(String)
+        interdisciplinary_context = String()
 
     museum_object = Field(lambda: MuseumObject)
     ok = ProtectedBool()
@@ -101,10 +95,7 @@ class CreateMuseumObject(Mutation):
         art_type = kwargs.get('art_type', None)
         creator = kwargs.get('creator', None)
         material = kwargs.get('material', None)
-        length = kwargs.get('length', None)
-        height = kwargs.get('height', None)
-        width = kwargs.get('width', None)
-        diameter = kwargs.get('diameter', None)
+        size = kwargs.get('size', None)
         location = kwargs.get('location', None)
         description = kwargs.get('description', None)
         additional_information = kwargs.get('additional_information', None)
@@ -113,18 +104,17 @@ class CreateMuseumObject(Mutation):
         if get_jwt_claims() == admin_claim:
 
             if not MuseumObjectModel.objects(object_id=object_id):
-                size = dict(length=length, height=height, width=width, diameter=diameter)
                 museum_object = MuseumObjectModel(object_id=object_id, category=category, sub_category=sub_category,
                                                   title=title, time_range=time_range, year=year,
                                                   art_type=art_type, creator=creator, material=material,
-                                                  size=size, location=location, description=description,
+                                                  size_=size, location=location, description=description,
                                                   additional_information=additional_information,
                                                   interdisciplinary_context=interdisciplinary_context)
                 if picture is not None:
                     pics = []
                     for pic in picture:
                         x = PictureModel()
-                        x.picture.put(pic, content_type='image/png')
+                        x.picture.put(pic, content_type='image/jpeg')
                         x.save()
                         pics.append(x)
                     museum_object.update(set__picture=pics)
@@ -144,18 +134,16 @@ class UpdateMuseumObject(Mutation):
                     category, String, optional, category of the object in the museum. 'Abteilung'
                     subCategory, String, optional, sub-category of the object in the museum. 'Sammlungsbereich'
                     title, String, optional, name of the object
-                    year, List of Strings, optional, year the object was created/found
+                    year, String, optional, year the object was created/found
                     picture, List of String, optional, document ids of existing Picture objects in the database
-                    art_type, List of Strings, optional, classification of the object e.g. 'painting'
-                    creator, List of Strings, optional, creators of the object
-                    material, List of Strings, optional, materials the object is made of
-                    width, Int, optional, width of the object in centimeters
-                    height, Int, optional, height of the object in centimeters
-                    length, Int, length of the object in centimeters
-                    diameter, optional, Int, diameter of the object in centimeters
-                    location, optional, List of Strings, optional, locations the object was made/found at
-                    description, optional, String, optional, description of the object
+                    art_type, String, optional, classification of the object e.g. 'painting'
+                    creator, String, optional, creators of the object
+                    material, String, optional, materials the object is made of
+                    size, String, optional, information about the size of the object
+                    location, Strings, optional, locations the object was made/found at
+                    description, String, optional, description of the object
                     interdisciplinary_context, String, optional, interdisciplinary relations of the object
+                    additional_information, String, additional information about the object
         returns the updated object and True if successful
         returns Null and False if token did not belong to admin or object with that id does not exist or a picture id
             was invalid.
@@ -169,19 +157,16 @@ class UpdateMuseumObject(Mutation):
         sub_category = String()
         time_range = String()
         title = String()
-        year = List(String)
+        year = String()
         picture = List(String)
-        art_type = List(String)
-        creator = List(String)
-        material = List(String)
-        width = Int()
-        height = Int()
-        length = Int()
-        diameter = Int()
-        location = List(String)
+        art_type = String()
+        creator = String()
+        material = String()
+        size = String()
+        location = String()
         additional_information = String()
         description = String()
-        interdisciplinary_context = List(String)
+        interdisciplinary_context = String()
 
     museum_object = Field(lambda: MuseumObject)
     ok = ProtectedBool()
@@ -203,10 +188,7 @@ class UpdateMuseumObject(Mutation):
                 art_type = kwargs.get('art_type', None)
                 creator = kwargs.get('creator', None)
                 material = kwargs.get('material', None)
-                length = kwargs.get('length', None)
-                height = kwargs.get('height', None)
-                width = kwargs.get('width', None)
-                diameter = kwargs.get('diameter', None)
+                size = kwargs.get('size', None)
                 location = kwargs.get('location', None)
                 description = kwargs.get('description', None)
                 additional_information = kwargs.get('additional_information', None)
@@ -239,15 +221,8 @@ class UpdateMuseumObject(Mutation):
                     museum_object.update(set__creator=creator)
                 if material is not None:
                     museum_object.update(set__material=material)
-                if museum_object.size is not None:
-                    if width is not None:
-                        museum_object.update(set__size__width=width)
-                    if length is not None:
-                        museum_object.update(set__size__length=length)
-                    if height is not None:
-                        museum_object.update(set__size__height=height)
-                    if diameter is not None:
-                        museum_object.update(set__size__diameter=diameter)
+                if size is not None:
+                    museum_object.update(set__size_=size)
                 if location is not None:
                     museum_object.update(set__location=location)
                 if description is not None:
@@ -679,7 +654,7 @@ class CreateProfilePicture(Mutation):
         create a new profile picture for users to choose.
         Parameters:
             token, String, valid jwt access token of an admin
-            picture, Upload, the profile picture in png format
+            picture, Upload, the profile picture in jpeg format
         if successful returns True
         if unsuccessful because token was invalid returns empty value
         if unsuccessful because token did not belong to admin returns False
@@ -698,7 +673,7 @@ class CreateProfilePicture(Mutation):
         if not get_jwt_claims() == admin_claim:
             return CreateProfilePicture(ok=BooleanField(boolean=False), picture=None)
         pic = ProfilePictureModel()
-        pic.picture.put(picture, content_type='image/png')
+        pic.picture.put(picture, content_type='image/jpeg')
         pic.save()
         return CreateProfilePicture(ok=BooleanField(boolean=True), picture=pic)
 
@@ -718,7 +693,7 @@ class CreatePicture(Mutation):
         if not get_jwt_claims() == admin_claim:
             return CreatePicture(ok=BooleanField(boolean=False), picture=None)
         pic = PictureModel(description=description)
-        pic.picture.put(picture, content_type='image/png')
+        pic.picture.put(picture, content_type='image/jpeg')
         pic.save()
         return CreatePicture(ok=BooleanField(boolean=True), picture=pic)
 
@@ -791,7 +766,7 @@ class UpdatePicture(Mutation):
         Parameters:
             token, String, valid jwt access token with admin claim
             picture_id, String, id of the picture to edit
-            picture, Upload, image in png format
+            picture, Upload, image in jpeg format
             description, String, new description for the picture
 
         if successful returns the updated picture and true
@@ -824,7 +799,7 @@ class UpdatePicture(Mutation):
         if description is not None:
             picture_object.update(set__description=description)
         if picture is not None:
-            picture_object.picture.replace(picture, content_type='image/png')
+            picture_object.picture.replace(picture, content_type='image/jpeg')
         picture_object.save()
         picture_object.reload()
         return UpdatePicture(picture=picture_object, ok=BooleanField(boolean=True))
@@ -836,7 +811,7 @@ class UpdateProfilePicture(Mutation):
         Parameters:
             token, String, valid jwt access token with admin claim
             picture_id, String, id of the profile picture to edit
-            picture, Upload, image in png format
+            picture, Upload, image in jpeg format
 
         if successful returns the updated profile picture and true
         if unsuccessful because the token is invalid returns empty value for ok
@@ -861,7 +836,7 @@ class UpdateProfilePicture(Mutation):
         if not ProfilePictureModel.objects(id=picture_id):
             return UpdateProfilePicture(picture=None, ok=BooleanField(boolean=False))
         profile_picture = ProfilePictureModel.objects.get(id=picture_id)
-        profile_picture.picture.replace(picture, content_type='image/png')
+        profile_picture.picture.replace(picture, content_type='image/jpeg')
         profile_picture.save()
         profile_picture.reload()
         return UpdateProfilePicture(picture=profile_picture, ok=BooleanField(boolean=True))

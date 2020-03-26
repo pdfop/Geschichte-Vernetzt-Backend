@@ -177,10 +177,7 @@ class Query(ObjectType):
                          description=String(),
                          interdisciplinary_context=String(),
                          additional_information=String(),
-                         height=Int(),
-                         width=Int(),
-                         length=Int(),
-                         diameter=Int())
+                         size=String())
 
     @classmethod
     @query_jwt_required
@@ -203,10 +200,7 @@ class Query(ObjectType):
         interdisciplinary_context = kwargs.get('interdisciplinary_context', None)
         time_range = kwargs.get('time_range', None)
         additional_information = kwargs.get('additional_information', None)
-        height = kwargs.get('height', None)
-        length = kwargs.get('length', None)
-        width = kwargs.get('width', None)
-        diameter = kwargs.get('diameter', None)
+        size = kwargs.get('size', None)
 
         result = MuseumObjectModel.objects.all()
         if object_id is not None:
@@ -218,31 +212,25 @@ class Query(ObjectType):
         if title is not None:
             result = result(title=title)
         if year is not None:
-            result = result(year__contains=year)
+            result = result(year=year)
         if art_type is not None:
-            result = result(art_type__contains=art_type)
+            result = result(art_type=art_type)
         if creator is not None:
-            result = result(creator__contains=creator)
+            result = result(creator=creator)
         if material is not None:
-            result = result(material__contains=material)
+            result = result(material=material)
         if time_range is not None:
-            result = result(size=time_range)
+            result = result(time_range=time_range)
         if location is not None:
-            result = result(location__contains=location)
+            result = result(location=location)
         if description is not None:
             result = result(description=description)
         if interdisciplinary_context is not None:
             result = result(interdisciplinary_context=interdisciplinary_context)
         if additional_information is not None:
             result = result(additional_information=additional_information)
-        if height is not None:
-            result = result(size__height=height)
-        if length is not None:
-            result = result(size__length=length)
-        if width is not None:
-            result = result(size__width=width)
-        if diameter is not None:
-            result = result(size__diameter=diameter)
+        if size is not None:
+            result = result(size_=size)
         return list(result)
 
     """ returns the current user as object allowing to query e.g. the profile picture id"""
