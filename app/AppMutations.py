@@ -895,6 +895,7 @@ class CreateQuestion(Mutation):
         show_text = kwargs.get('show_text', False)
         show_picture = kwargs.get('show_picture', False)
         show_details = kwargs.get('show_details', False)
+        text = kwargs.get('text', None)
         if linked_objects is None:
             linked_objects = []
         # get the current user object to check for permissions
@@ -923,7 +924,7 @@ class CreateQuestion(Mutation):
                     tour.save()
                     tour.reload()
                     question = QuestionModel(linked_objects=links,
-                                             question=question_text, tour=tour, index=current_index,
+                                             question=question_text, text=text, tour=tour, index=current_index,
                                              show_details=show_details, show_picture=show_picture, show_text=show_text)
                     question.save()
                     return CreateQuestion(question=question,
@@ -958,6 +959,7 @@ class CreateMCQuestion(Mutation):
         correct_answers = List(of_type=Int, required=True)
         max_choices = Int(required=True)
         tour_id = String(required=True)
+        text = String()
         show_text = Boolean()
         show_picture = Boolean()
         show_details = Boolean()
@@ -973,6 +975,7 @@ class CreateMCQuestion(Mutation):
         show_text = kwargs.get('show_text', False)
         show_picture = kwargs.get('show_picture', False)
         show_details = kwargs.get('show_details', False)
+        text = kwargs.get('text', None)
         # get the current user object to check for permissions
         username = get_jwt_identity()
         if UserModel.objects(username=username):
@@ -1001,7 +1004,7 @@ class CreateMCQuestion(Mutation):
                                                question=question_text, possible_answers=possible_answers,
                                                correct_answers=correct_answers, max_choices=max_choices, tour=tour,
                                                index=current_index, show_text=show_text, show_picture=show_picture,
-                                               show_details=show_details)
+                                               show_details=show_details, text=text)
                     question.save()
                     return CreateMCQuestion(question=question,
                                             ok=BooleanField(boolean=True))
