@@ -3,7 +3,7 @@ import mongoengine
 from flask_mongoengine import MongoEngine
 from mongoengine import register_connection
 from models.Badge import Badge
-from models.User import User
+#from models.User import User
 """
 Ingestion script for badges. Allows adding profile pictures to the database in bulk. Pictures are assumed to 
 be in png format and located at data/badges relative to the location of this script.
@@ -52,11 +52,11 @@ def ingest_badges():
                         badge.save()
                         # reloading to get id
                         badge.reload()
-                        for user in User.objects.all():
-                            badges = user.badge_progress
-                            badges[str(id)] = 0
-                            user.update(set__badge_progress=badges)
-                            user.save()
+                        #for user in User.objects.all():
+                           # badges = user.badge_progress
+                            #badges[str(id)] = 0
+                            #user.update(set__badge_progress=badges)
+                            #user.save()
                         # printing id for feedback on if the script is working.
                         print(badge.id)
 
