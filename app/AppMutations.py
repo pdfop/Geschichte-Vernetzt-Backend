@@ -654,6 +654,9 @@ class CreatePictureCheckpoint(Mutation):
         #picture = Upload()
         #picture_description = String()
         text = String()
+        show_text = Boolean()
+        show_picture = Boolean()
+        show_details = Boolean()
 
     checkpoint = Field(lambda: PictureCheckpoint)
     ok = Field(ProtectedBool)
@@ -661,17 +664,24 @@ class CreatePictureCheckpoint(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, tour_id, **kwargs):
-        if TourModel.object(id=tour_id):
+        # assert tour exists
+        if TourModel.objects(id=tour_id):
             tour = TourModel.objects.get(id=tour_id)
         else:
             return CreatePictureCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
-        user = UserModel.objects.get(get_jwt_identity())
+        # get user and assert user owns the tour
+        user = UserModel.objects.get(username=get_jwt_identity())
         if not user == tour.owner:
             return CreatePictureCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
-        picture_id = kwargs.get('picture_id', None)
         #picture = kwargs.get('picture', None)
         #picture_description = kwargs.get('picture_description', None)
+
+        # get optional arguments
+        picture_id = kwargs.get('picture_id', None)
         text = kwargs.get('text', None)
+        show_text = kwargs.get('show_text', False)
+        show_picture = kwargs.get('show_picture', False)
+        show_details = kwargs.get('show_details', False)
         # add checkpoint to the end of the tour
         current_index = tour.current_checkpoints
         current_index += 1
@@ -680,8 +690,10 @@ class CreatePictureCheckpoint(Mutation):
         tour.reload()
         if picture_id is not None:
             if PictureModel(id=picture_id):
-                pic = PictureModel(id=picture_id)
-                checkpoint = PictureCheckpointModel(picture=pic, tour=tour, text=text, index=current_index)
+                pic = PictureModel.objects.get(id=picture_id)
+                checkpoint = PictureCheckpointModel(picture=pic, tour=tour, text=text, index=current_index,
+                                                    show_details=show_details, show_picture=show_picture,
+                                                    show_text=show_text)
                 checkpoint.save()
                 return CreatePictureCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
         return CreatePictureCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
