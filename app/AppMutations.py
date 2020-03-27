@@ -595,6 +595,9 @@ class CreateCheckpoint(Mutation):
         token = String(required=True)
         tour_id = String(required=True)
         text = String()
+        show_text = Boolean()
+        show_picture = Boolean()
+        show_details = Boolean()
 
     checkpoint = Field(lambda: Checkpoint)
     ok = Field(ProtectedBool)
@@ -615,11 +618,16 @@ class CreateCheckpoint(Mutation):
         tour.update(set__current_checkpoints=current_index)
         tour.save()
         tour.reload()
-        checkpoint = CheckpointModel(tour=tour, index=current_index)
+        # handling optional parameters
         text = kwargs.get('text', None)
-        if text is not None:
-            checkpoint.update(set__text=text)
+        show_text = kwargs.get('show_text', False)
+        show_picture = kwargs.get('show_picture', False)
+        show_details = kwargs.get('show_details', False)
+        # creating checkpoint
+        checkpoint = CheckpointModel(tour=tour, index=current_index, text=text, show_text=show_text,
+                                     show_picture=show_picture, show_details=show_details)
         checkpoint.save()
+        checkpoint.reload()
         return CreateCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
 
