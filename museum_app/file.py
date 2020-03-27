@@ -102,6 +102,11 @@ def upload():
         f = request.files['file']
         badge.picture.put(f, content_type='image/png')
         badge.save()
+        for user in User.objects.all():
+            badges = user.badge_progress
+            badges[str(id)] = 0
+            user.update(set__badge_progress=badges)
+            user.save()
         return str(id)
     else:
         return jsonify({"Error": "Invalid type"})

@@ -10,5 +10,5 @@ class Badge(Document):
     id = StringField(required=True, primary_key=True)
     name = StringField(required=True)
     picture = FileField(content_type='image/png')
-    description = StringField(required=True)
+    description = StringField()
     cost = IntField(required=True)
