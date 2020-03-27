@@ -15,6 +15,7 @@ Name and id for the badge are inferred from file name. Cost for now is fixed for
 mongo = MongoEngine()
 mongoengine.connect(host='localhost:27017')
 register_connection("file", "file")
+register_connection("user", "user")
 
 
 def ingest_badges():
