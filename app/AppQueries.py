@@ -1,6 +1,6 @@
 from flask_graphql_auth import get_jwt_identity, query_jwt_required
 from graphene import ObjectType, List, String
-from app.Fields import User, Tour, MuseumObject, TourFeedback, CheckpointUnion, AnswerUnion
+from app.Fields import User, Tour, MuseumObject, TourFeedback, CheckpointUnion, AnswerUnion, Badge
 from models.User import User as UserModel
 from models.Tour import Tour as TourModel
 from models.Favourites import Favourites as FavouritesModel
@@ -10,6 +10,7 @@ from models.Checkpoint import Checkpoint as CheckpointModel
 from models.ProfilePicture import ProfilePicture as ProfilePictureModel
 from models.Question import Question as QuestionModel
 from models.Answer import Answer as AnswerModel
+from models.Badge import Badge as BadgeModel
 
 """
     These are the queries available to the App API. 
@@ -243,6 +244,13 @@ class Query(ObjectType):
     profile_picture = List(String, token=String(), username=String())
     """ returns the ids of all possible profile pictures """
     available_profile_pictures = List(String, token=String())
+    """ returns all available badges """
+    available_badges = List(Badge, token=String())
+    
+    @classmethod
+    @query_jwt_required
+    def resolve_available_badges(cls, _, info):
+        return BadgeModel.objects.all()
 
     @classmethod
     @query_jwt_required
