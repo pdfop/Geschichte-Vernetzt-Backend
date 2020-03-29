@@ -23,8 +23,7 @@ def create_app(config_object='museum_app.settings'):
         view_func=FileUploadGraphQLView.as_view(
             'web',
             schema=web_schema,
-            # TODO: set to false for production
-            graphiql=True
+            graphiql=False
         )
     )
     app.add_url_rule(
@@ -32,8 +31,7 @@ def create_app(config_object='museum_app.settings'):
         view_func=FileUploadGraphQLView.as_view(
             'app',
             schema=app_schema,
-            # TODO: set to false for production
-            graphiql=True
+            graphiql=False
         )
     )
     try:
@@ -41,12 +39,7 @@ def create_app(config_object='museum_app.settings'):
     except OSError:
         pass
 
-    # TODO: remove for production
-    # landing page for entire app
-    @app.route('/')
-    def hello():
-        return 'Hello World!'
-
+    # bind for alternative file up&download. routes found in museum_app.file
     app.register_blueprint(fileBP)
     return app
 

@@ -1,6 +1,6 @@
 from flask_graphql_auth import query_jwt_required, get_jwt_claims
-from graphene import ObjectType, List, String, Field, Boolean, Int
-from app.Fields import Tour, MuseumObject, Code, AppFeedback, TourFeedback, Checkpoint, CheckpointUnion, User
+from graphene import ObjectType, List, String
+from app.Fields import Tour, MuseumObject, Code, AppFeedback, TourFeedback, CheckpointUnion
 from models.AppFeedback import AppFeedback as AppFeedbackModel
 from models.Tour import Tour as TourModel
 from models.Code import Code as CodeModel
@@ -11,16 +11,30 @@ from app.WebMutations import admin_claim
 
 
 class Query(ObjectType):
+    """ returns all tours pending for review """
     pending = List(Tour, token=String())
+    """ returns all currently featured tours """
     featured = List(Tour, token=String())
+    """ returns all feedback ever submitted for the app """
     feedback = List(AppFeedback, token=String())
+    """ returns only unread feedback """
     unread_feedback = List(AppFeedback, token=String())
+    """ returns all promotion codes currently available in the database"""
     codes = List(Code, token=String())
+    """ allows admins to query all feedback for any tour e.g. to assist in the review process"""
     tour_feedback = List(TourFeedback, tour_id=String(), token=String())
+    """ allows admins to query any tour """
     tour = List(Tour, token=String(), tour_id=String())
+    """ allows admins to query any checkpoint """
     checkpoint = List(CheckpointUnion, token=String(), checkpoint_id=String())
+    """ allows admins to query all checkpoints that are part of a given tour """
     checkpoints_by_tour = List(CheckpointUnion, token=String(), tour_id=String())
+    """ returns all museum objects currently in the database """
     all_objects = List(MuseumObject, token=String())
+    """ returns all objects matching the queryset. all parameters except token are optional. 
+        accepts as few or many as needed. in the current iteration all text fields have to be queried using the EXACT 
+        value in the database.
+    """
     museum_object = List(MuseumObject, object_id=String(),
                          category=String(),
                          sub_category=String(),

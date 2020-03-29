@@ -115,6 +115,26 @@ class ObjectCheckpoint(MongoengineObjectType):
 
 
 class CheckpointUnion(Union):
+    """
+        This is the return type for calls that may return any type of checkpoint. The inheritance between Checkpoint
+        and its subclasses in mongoengine is not transferred to the Graphene Fields defined here so Field type
+        represents this inheritance. It is queried by splitting the result on type like any union. e.g.
+        checkpoint{
+            ... on Question
+            {
+                id
+                question
+            }
+            ... on ObjectCheckpoint
+            {
+                id
+                object
+                {
+                    title
+                }
+            }
+        }
+    """
     class Meta:
         types = (PictureCheckpoint, ObjectCheckpoint, MCQuestion, Question, Checkpoint)
 
@@ -131,3 +151,14 @@ class CheckpointUnion(Union):
         elif isinstance(instance, Checkpoint):
             return Checkpoint
 
+
+class AnswerUnion(Union):
+    class Meta:
+        types = (Answer, MCAnswer)
+
+    @classmethod
+    def resolve_type(cls, instance, info):
+        if isinstance(instance, MCAnswer):
+            return MCAnswer
+        elif isinstance(instance, Answer):
+            return Answer

@@ -3,7 +3,7 @@ from flask_graphql_auth import create_access_token, create_refresh_token, mutati
 from graphene import ObjectType, List, Mutation, String, Field, Boolean, Int
 from werkzeug.security import generate_password_hash, check_password_hash
 from .ProtectedFields import ProtectedBool, BooleanField, ProtectedString, StringField
-from app.Fields import User, AppFeedback, Favourites, Tour, Question, Answer, TourFeedback, MuseumObject, MCQuestion, \
+from app.Fields import User, AppFeedback, Favourites, Tour, Question, Answer, TourFeedback, MCQuestion, \
     MCAnswer, Checkpoint, PictureCheckpoint, ObjectCheckpoint, CheckpointUnion
 from models.User import User as UserModel
 from models.Code import Code as CodeModel
@@ -44,7 +44,7 @@ class CreateUser(Mutation):
        Parameters: username, String, name of the account. has to be unique
                    password, String, password, no requirements, saved as a hash
        if successful returns the created user and ok=True
-       fails if the username is already taken. returns Null and False in that case
+       returns Null and False if the username is already taken
     """
 
     class Arguments:
@@ -58,6 +58,7 @@ class CreateUser(Mutation):
         # ensure there is no user with this name
         # making this check here prevents a mongoengine error but uniqueness of the name is also enforced in the model
         if not UserModel.objects(username=username):
+            # password is hashed before storing
             user = UserModel(username=username, password=generate_password_hash(password))
             user.save()
             return CreateUser(user=user, ok=True)
@@ -118,7 +119,7 @@ class PromoteUser(Mutation):
     """Use a promotion code to promote a user's account to producer status.
        Parameters: token, String, valid jwt access token of a user
                    code, String, 5 character string used as promotion password
-        if successful returns the updated user object and ok=True
+        if successful returns the updated user object and ok=True. also deletes the used code from the database
         if unsuccessful because the code was invalid returns Null and False
         if unsuccessful because the token was invalid returns empty value for ok
         """
@@ -171,6 +172,7 @@ class ChangePassword(Mutation):
     def mutate(cls, _, info, password):
         username = get_jwt_identity()
         user = UserModel.objects.get(username=username)
+        # password is hashed before saving
         user.update(set__password=generate_password_hash(password))
         user.save()
         return ChangePassword(ok=BooleanField(boolean=True))
@@ -316,12 +318,12 @@ class DeleteAccount(Mutation):
 class SendFeedback(Mutation):
     """Send Feedback about the App to the admins. Feedback is anonymous.
         Feedback consists of a rating on a scale from 1-5 and a text review.
+        If the supplied value for rating is outside of the range it is force to be in it.
         Parameters: token, String, valid jwt access token of a user
                     rating, Int, rating on a scale of 1-5
                     review, String, text review / feedback
         returns the feedback object and True if successful
         returns Null and an empty value for ok if the token was invalid
-        returns Null and False if the rating was not in the range of 1-5
     """
 
     class Arguments:
@@ -585,7 +587,10 @@ class CreateCheckpoint(Mutation):
         Parameters:
             token, String, valid jwt access token
             tour_id, String, object id of a valid tour
-            text, String, optional, text on the checkpoint
+            text, String, additional optional description text for the checkpoint
+            show_text: Boolean, optional, default False, indicates to the app if object text fields should be shown
+            show_picture: Boolean, optional, default False, indicates to the app if object pictures should be shown
+            show_details: Boolean, optional, default False, indicates to the app if details should be shown
         caller has to be owner of tour
         if successful returns the created checkpoint and True
         if unsuccessful because the tour did not exist or the caller did not own the tour returns Null and False
@@ -637,7 +642,10 @@ class CreatePictureCheckpoint(Mutation):
         Parameters:
             token, String, valid jwt access token
             tour_id, String, object id of a valid tour
-            text, String, optional, text on the checkpoint
+            text, String, additional optional description text for the checkpoint
+            show_text: Boolean, optional, default False, indicates to the app if object text fields should be shown
+            show_picture: Boolean, optional, default False, indicates to the app if object pictures should be shown
+            show_details: Boolean, optional, default False, indicates to the app if details should be shown
             picture_id, String, optional, id of an existing picture in the database to turn into a checkpoint
             #picture, Upload, optional, image in png format to create a checkpoint with a new image
             #picture_description, String, optional, description of the uploaded picture (NOT of the checkpoint)
@@ -714,6 +722,9 @@ class CreateObjectCheckpoint(Mutation):
             tour_id, String, id of a tour to add the checkpoint to
             object_id, String, object_id of the object to reference
             text, String, additional optional description text for the checkpoint
+            show_text: Boolean, optional, default False, indicates to the app if object text fields should be shown
+            show_picture: Boolean, optional, default False, indicates to the app if object pictures should be shown
+            show_details: Boolean, optional, default False, indicates to the app if details should be shown
         if successful returns the created checkpoint and True
         if unsuccessful because the token was invalid returns an empty value for ok
         returns Null and False if unsuccessful because
@@ -879,6 +890,10 @@ class CreateQuestion(Mutation):
             question_text, String, the text of the question
             tour_id, String, id of the tour to add the checkpoint to
             linked_objects, List of String, list of object_id of objects the question references
+            text, String, additional optional description text for the checkpoint
+            show_text: Boolean, optional, default False, indicates to the app if object text fields should be shown
+            show_picture: Boolean, optional, default False, indicates to the app if object pictures should be shown
+            show_details: Boolean, optional, default False, indicates to the app if details should be shown
         if successful returns the created question and ok=True
         if unsuccessful because the token was invalid returns empty value for ok
         returns Null and False if unsuccessful because
@@ -956,6 +971,10 @@ class CreateMCQuestion(Mutation):
             max_choices, Int, maximum numbers of answers that can be chosen
             possible_answers, List of String, list of possible answers to the question
             correct_answers, List of Int, indices of the answers in possible_answers that are correct
+            text, String, additional optional description text for the checkpoint
+            show_text: Boolean, optional, default False, indicates to the app if object text fields should be shown
+            show_picture: Boolean, optional, default False, indicates to the app if object pictures should be shown
+            show_details: Boolean, optional, default False, indicates to the app if details should be shown
         if successful returns the created multiple choice question and ok=True
         if unsuccessful because the token was invalid returns empty value for ok
         returns Null and False if unsuccessful because
@@ -1025,7 +1044,7 @@ class CreateMCQuestion(Mutation):
 
 
 class AddMember(Mutation):
-    """Join a Tour using its session code.
+    """Join a Tour using its session code. Featured tours can be joined without session code.
        Parameters: token, String, access token of a user
                    tour_id, String, document id of an existing Tour object
                    session_id, Int, current session id of the tour
@@ -1050,6 +1069,7 @@ class AddMember(Mutation):
             tour = TourModel.objects.get(id=tour_id)
             # assert the provided session id is valid for the tour
             session_id = kwargs.get('session_id', None)
+            # featured tours can also be joined by anyone without session id
             if tour.session_id == session_id or tour.status == 'featured':
                 username = get_jwt_identity()
                 # get user object to reference in the users list of the tour
@@ -1246,6 +1266,17 @@ class SubmitFeedback(Mutation):
 
 
 class MoveCheckpoint(Mutation):
+    """
+        Change the index of a given checkpoint in its tour. Can only be used by the tour owner. Indices of other
+        checkpoints in the tour are automatically adjusted accordingly.
+        Parameters:
+                token: String, valid jwt access token
+                checkpoint_id: String, document id of the checkpoint to move
+                index: Int, the index to put the checkpoint at. values greater than the current_checkpoints field of the
+                    tour move the checkpoint to the end. -1 also moves the checkpoint to the end
+        if successful returns the updated checkpoint and True
+        if unsuccessful because the id was invalid or the user is not the owner of the tour returns Null and False
+    """
     class Arguments:
         token = String(required=True)
         checkpoint_id = String(required=True)
@@ -1373,6 +1404,9 @@ class EditCheckpoint(Mutation):
             possible_answers, List of String, update the possible answers of a MCQuestion
             correct_answers, List of Int, update the correct answers of a MCQuestion
             max_choices, Int, new max choices value for a MCQuestion
+            show_text, Boolean, optional, default False, indicates to the app if object text fields should be shown
+            show_picture, Boolean, optional, default False, indicates to the app if object pictures should be shown
+            show_details, Boolean, optional, default False, indicates to the app if details should be shown
         if successful returns the updated checkpoint and True
         if unsuccessful because the token was invalid returns emtpy value for ok
         returns Null and False if unsuccessful because
@@ -1393,6 +1427,10 @@ class EditCheckpoint(Mutation):
         possible_answers = List(String)
         correct_answers = List(Int)
         max_choices = Int()
+        show_text = Boolean()
+        show_picture = Boolean()
+        show_details = Boolean()
+
 
     checkpoint = Field(lambda: CheckpointUnion)
     ok = Field(ProtectedBool)
@@ -1419,6 +1457,20 @@ class EditCheckpoint(Mutation):
         possible_answers = kwargs.get('possible_answers', None)
         correct_answers = kwargs.get('correct_answers', None)
         max_choices = kwargs.get('max_choices', None)
+        show_text = kwargs.get('show_text', False)
+        show_picture = kwargs.get('show_picture', False)
+        show_details = kwargs.get('show_details', False)
+        # handle fields that all checkpoints share first
+        if text is not None:
+            checkpoint.update(set__text=text)
+        if show_text != checkpoint.show_text:
+            checkpoint.update(set__show_text=show_text)
+        if show_picture != checkpoint.show_picture:
+            checkpoint.update(set__show_picture=show_picture)
+        if show_details != checkpoint.show_details:
+            checkpoint.update(set__show_details=show_details)
+        checkpoint.save()
+        checkpoint.reload()
         # treat checkpoint update depending on the type of the checkpoint
         if isinstance(checkpoint, ObjectCheckpointModel):
             # assert new object exists
@@ -1427,9 +1479,6 @@ class EditCheckpoint(Mutation):
                     return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
                 museum_object = MuseumObjectModel.objects.get(object_id=object_id)
                 checkpoint.update(set__museum_object=museum_object)
-                # text may be changed on any checkpoint
-            if text is not None:
-                checkpoint.update(set__text=text)
             checkpoint.save()
             checkpoint.reload()
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
@@ -1465,8 +1514,6 @@ class EditCheckpoint(Mutation):
                     else:
                         new_links.append(MuseumObjectModel.objects.get(object_id=oid))
                 checkpoint.update(set__linked_objects=new_links)
-            if text is not None:
-                checkpoint.update(set__text=text)
             checkpoint.save()
             checkpoint.reload()
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
@@ -1481,17 +1528,11 @@ class EditCheckpoint(Mutation):
                     else:
                         new_links.append(MuseumObjectModel.objects.get(object_id=oid))
                 checkpoint.update(set__linked_objects=new_links)
-            if text is not None:
-                checkpoint.update(set__text=text)
             checkpoint.save()
             checkpoint.reload()
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
-        # last remaining option is a basic text checkpoint
+        # last remaining choice is the checkpoint was a simple text checkpoint
         else:
-            if text is not None:
-                checkpoint.update(set__text=text)
-            checkpoint.save()
-            checkpoint.reload()
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
 

@@ -4,6 +4,15 @@ from graphene import ObjectType, String, Boolean, Union
 """
 This file is the collection of protected unions of various data types and jwt-auths's AuthInfoField
 These fields are used in the schemas to implement protected access to data. 
+Unions are queried like interfaces e.g. 
+ok {
+    ... on BooleanField
+    {
+        boolean
+    }
+    }
+Query in this way will return {} if ok was not an instance of BooleanField in which case it would be an instance of 
+AuthInfoField which indicates an invalid token passed to the function 
 """
 
 

@@ -10,5 +10,6 @@ class MultipleChoiceAnswer(Answer):
         Saved in tour.answer
         Linked to a MultipleChoiceQuestion
     """
+    # overwrites these from the parent class Answer to adapt to MultipleChoiceQuestion
     question = ReferenceField(document_type=MultipleChoiceQuestion, required=True, reverse_delete_rule=CASCADE)
     answer = ListField(IntField())

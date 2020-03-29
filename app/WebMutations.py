@@ -241,7 +241,7 @@ class CreateAdmin(Mutation):
            Parameters: username, String, name of the account. has to be unique
                        password, String, password, no requirements, saved as a hash
            if successful returns the created user and ok=True
-           fails if the username is already taken. returns Null and False in that case
+           if unsuccessful because the username is already taken returns Null and False
     """
 
     class Arguments:
@@ -268,7 +268,7 @@ class DeleteMuseumObject(Mutation):
         returns false if token does not have admin claim
         returns empty value if token was invalid
         is successful if object does not exist
-        deletes all references to the object in favourites, tours, questions
+        deletes all references to the object in favourites, tours and questions
          """
 
     class Arguments:
@@ -346,7 +346,8 @@ class ChangePassword(Mutation):
     @mutation_jwt_required
     def mutate(cls, _, info, password):
         username = get_jwt_identity()
-        user = AdminModel.objects(username=username)[0]
+        user = AdminModel.objects.get(username=username)
+        # password is again saved as a hash
         user.update(set__password=generate_password_hash(password))
         user.save()
         return ChangePassword(ok=BooleanField(boolean=True))
@@ -371,7 +372,7 @@ class Auth(Mutation):
     @classmethod
     def mutate(cls, _, info, username, password):
         if not (AdminModel.objects(username=username) and check_password_hash(
-                AdminModel.objects(username=username)[0].password, password)):
+                AdminModel.objects.get(username=username).password, password)):
             return Auth(ok=False)
         else:
             return Auth(access_token=create_access_token(username, user_claims=admin_claim),
@@ -672,7 +673,9 @@ class CreateProfilePicture(Mutation):
     def mutate(cls, _, info, picture):
         if not get_jwt_claims() == admin_claim:
             return CreateProfilePicture(ok=BooleanField(boolean=False), picture=None)
+        # create document
         pic = ProfilePictureModel()
+        # pass data to the FileField
         pic.picture.put(picture, content_type='image/jpeg')
         pic.save()
         return CreateProfilePicture(ok=BooleanField(boolean=True), picture=pic)
@@ -692,7 +695,9 @@ class CreatePicture(Mutation):
     def mutate(cls, _, info, picture, description=None):
         if not get_jwt_claims() == admin_claim:
             return CreatePicture(ok=BooleanField(boolean=False), picture=None)
+        # create document
         pic = PictureModel(description=description)
+        # pass data to the FileField
         pic.picture.put(picture, content_type='image/jpeg')
         pic.save()
         return CreatePicture(ok=BooleanField(boolean=True), picture=pic)
@@ -732,17 +737,22 @@ class UpdateBadge(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, badge_id, **kwargs):
+        # assert caller is admin
         if not get_jwt_claims() == admin_claim:
             return UpdateBadge(badge=None, ok=BooleanField(boolean=False))
+        # assert badge exists
         if not BadgeModel.objects(id=badge_id):
             return UpdateBadge(badge=None, ok=BooleanField(boolean=False))
+        # get badge to modify
         badge = BadgeModel.objects.get(id=badge_id)
+        # get optional parameters
         picture = kwargs.get('picture', None)
         name = kwargs.get('name', None)
         description = kwargs.get('description', None)
         cost = kwargs.get('cost', None)
         new_id = kwargs.get('new_id', None)
         if new_id is not None:
+            # ensure new badge id is also unique
             if not BadgeModel.objects(id=new_id):
                 badge.update(set__id=new_id)
             else:
@@ -756,6 +766,7 @@ class UpdateBadge(Mutation):
         if picture is not None:
             badge.picture.replace(picture, content_type='image/png')
         badge.save()
+        # reload so updated object is returned
         badge.reload()
         return UpdateBadge(badge=badge, ok=BooleanField(boolean=True))
 
@@ -788,11 +799,15 @@ class UpdatePicture(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, picture_id, **kwargs):
+        # assert caller is admin
         if not get_jwt_claims() == admin_claim:
             return UpdatePicture(picture=None, ok=BooleanField(boolean=False))
+        # assert picture exists
         if not PictureModel.objects(id=picture_id):
             return UpdatePicture(picture=None, ok=BooleanField(boolean=False))
+        # get object to modify
         picture_object = PictureModel.objects.get(id=picture_id)
+        # get optional parameters
         picture = kwargs.get('picture', None)
         description = kwargs.get('description', None)
 
@@ -801,6 +816,7 @@ class UpdatePicture(Mutation):
         if picture is not None:
             picture_object.picture.replace(picture, content_type='image/jpeg')
         picture_object.save()
+        # reload so updated object is returned
         picture_object.reload()
         return UpdatePicture(picture=picture_object, ok=BooleanField(boolean=True))
 
@@ -831,13 +847,17 @@ class UpdateProfilePicture(Mutation):
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, picture_id, picture):
+        # assert caller is admin
         if not get_jwt_claims() == admin_claim:
             return UpdateProfilePicture(picture=None, ok=BooleanField(boolean=False))
+        # assert object exists
         if not ProfilePictureModel.objects(id=picture_id):
             return UpdateProfilePicture(picture=None, ok=BooleanField(boolean=False))
+        # get object to modify
         profile_picture = ProfilePictureModel.objects.get(id=picture_id)
         profile_picture.picture.replace(picture, content_type='image/jpeg')
         profile_picture.save()
+        # reload so updated object is returned
         profile_picture.reload()
         return UpdateProfilePicture(picture=profile_picture, ok=BooleanField(boolean=True))
 
@@ -876,6 +896,9 @@ class EditCheckpoint(Mutation):
         possible_answers = List(String)
         correct_answers = List(Int)
         max_choices = Int()
+        show_text = Boolean()
+        show_picture = Boolean()
+        show_details = Boolean()
 
     checkpoint = Field(lambda: CheckpointUnion)
     ok = Field(ProtectedBool)
@@ -900,6 +923,20 @@ class EditCheckpoint(Mutation):
         possible_answers = kwargs.get('possible_answers', None)
         correct_answers = kwargs.get('correct_answers', None)
         max_choices = kwargs.get('max_choices', None)
+        show_text = kwargs.get('show_text', False)
+        show_picture = kwargs.get('show_picture', False)
+        show_details = kwargs.get('show_details', False)
+        # handle fields that all checkpoints share first
+        if text is not None:
+            checkpoint.update(set__text=text)
+        if show_text != checkpoint.show_text:
+            checkpoint.update(set__show_text=show_text)
+        if show_picture != checkpoint.show_picture:
+            checkpoint.update(set__show_picture=show_picture)
+        if show_details != checkpoint.show_details:
+            checkpoint.update(set__show_details=show_details)
+        checkpoint.save()
+        checkpoint.reload()
         # treat checkpoint update depending on the type of the checkpoint
         if isinstance(checkpoint, ObjectCheckpointModel):
             # assert new object exists
@@ -908,9 +945,6 @@ class EditCheckpoint(Mutation):
                     return EditCheckpoint(checkpoint=None, ok=BooleanField(boolean=False))
                 museum_object = MuseumObjectModel.objects.get(object_id=object_id)
                 checkpoint.update(set__museum_object=museum_object)
-                # text may be changed on any checkpoint
-            if text is not None:
-                checkpoint.update(set__text=text)
             checkpoint.save()
             checkpoint.reload()
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
@@ -946,8 +980,6 @@ class EditCheckpoint(Mutation):
                     else:
                         new_links.append(MuseumObjectModel.objects.get(object_id=oid))
                 checkpoint.update(set__linked_objects=new_links)
-            if text is not None:
-                checkpoint.update(set__text=text)
             checkpoint.save()
             checkpoint.reload()
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
@@ -962,17 +994,11 @@ class EditCheckpoint(Mutation):
                     else:
                         new_links.append(MuseumObjectModel.objects.get(object_id=oid))
                 checkpoint.update(set__linked_objects=new_links)
-            if text is not None:
-                checkpoint.update(set__text=text)
             checkpoint.save()
             checkpoint.reload()
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
-        # last remaining option is a basic text checkpoint
+        # last remaining choice is the checkpoint was a simple text checkpoint
         else:
-            if text is not None:
-                checkpoint.update(set__text=text)
-            checkpoint.save()
-            checkpoint.reload()
             return EditCheckpoint(checkpoint=checkpoint, ok=BooleanField(boolean=True))
 
 

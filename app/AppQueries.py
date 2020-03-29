@@ -1,16 +1,15 @@
 from flask_graphql_auth import get_jwt_identity, query_jwt_required
-from graphene import ObjectType, List, String, Field, Int
-from app.Fields import User, Favourites, Tour, MuseumObject, Answer, TourFeedback, Question, Checkpoint, \
-    CheckpointUnion, ProfilePicture
+from graphene import ObjectType, List, String
+from app.Fields import User, Tour, MuseumObject, TourFeedback, CheckpointUnion, AnswerUnion
 from models.User import User as UserModel
 from models.Tour import Tour as TourModel
-from models.Answer import Answer as AnswerModel
 from models.Favourites import Favourites as FavouritesModel
 from models.MuseumObject import MuseumObject as MuseumObjectModel
 from models.TourFeedback import TourFeedback as TourFeedbackModel
-from models.Question import Question as QuestionModel
 from models.Checkpoint import Checkpoint as CheckpointModel
 from models.ProfilePicture import ProfilePicture as ProfilePictureModel
+from models.Question import Question as QuestionModel
+from models.Answer import Answer as AnswerModel
 
 """
     These are the queries available to the App API. 
@@ -24,14 +23,14 @@ from models.ProfilePicture import ProfilePicture as ProfilePictureModel
         feedback for a specific tour the user owns 
         all answers to a certain question 
         all answers by a certain user 
-        all my answers 
-        
-        
+        all my answers     
 """
 
 
 class Query(ObjectType):
+    """ returns the current user's favourite tours """
     favourite_tours = List(Tour, token=String())
+    """returns the current user's favourite objects"""
     favourite_objects = List(MuseumObject, token=String())
 
     @classmethod
@@ -160,9 +159,12 @@ class Query(ObjectType):
                 return [checkpoint]
         return []
 
-    # master query for objects
-
+    """returns all objects in the database"""
     all_objects = List(MuseumObject, token=String())
+    """ returns all objects matching the queryset. all parameters except token are optional. 
+        accepts as few or many as needed. in the current iteration all text fields have to be queried using the EXACT 
+        value in the database.
+    """
     museum_object = List(MuseumObject, object_id=String(),
                          category=String(),
                          sub_category=String(),
@@ -264,3 +266,65 @@ class Query(ObjectType):
             return [pic_id]
         return []
 
+    """ returns all answers the user has submitted to questions in a given tour """
+    answers_in_tour = List(AnswerUnion, token=String(), tour_id=String())
+    """ returns the current user's answer to a given question """
+    answer = List(AnswerUnion, token=String(), question_id=String())
+    """ returns all answers given to a certain question.
+        can only be called by the owner of the tour the question is in
+    """
+    answers_to_question = List(AnswerUnion, token=String(), question_id=String())
+    """ returns a given user's answer to all questions in a tour. 
+        can only be called by the owner of the tour the question is in 
+    """
+    answers_by_user = List(AnswerUnion, token=String(), username=String(), tour_id=String())
+
+    @classmethod
+    @query_jwt_required
+    def resolve_answers_in_tour(cls, _, info, tour_id):
+        if TourModel.objects(id=tour_id):
+            tour = TourModel.objects.get(id=tour_id)
+            questions = QuestionModel.objects(tour=tour)
+            answers = []
+            if questions:
+                for question in questions:
+                    answers.extend(AnswerModel.objects(question=question))
+            return answers
+        else:
+            return []
+
+    @classmethod
+    @query_jwt_required
+    def resolve_answer(cls, _, info, question_id):
+        if QuestionModel.objects(id=question_id):
+            question = QuestionModel.objects.get(id=question_id)
+            user = UserModel.objects.get(username=get_jwt_identity())
+            return [AnswerModel.objects.get(question=question, user=user)]
+        else:
+            return []
+
+    @classmethod
+    @query_jwt_required
+    def resolve_answers_to_question(cls, _, info, question_id):
+        if QuestionModel.objects(id=question_id):
+            question = QuestionModel.objects.get(id=question_id)
+            user = UserModel.objects.get(username=get_jwt_identity())
+            if question.tour.owner == user:
+                return list(AnswerModel.objects(question=question))
+        return []
+
+    @classmethod
+    @query_jwt_required
+    def resolve_answers_by_user(cls, _, info, username, tour_id):
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
+                owner = UserModel.objects.get(username=get_jwt_identity())
+                if tour.owner == owner:
+                    answers = []
+                    for answer in AnswerModel.objects(user=user):
+                        if answer.question.tour == tour:
+                            answers.append(answer)
+                    return answers
+        return []

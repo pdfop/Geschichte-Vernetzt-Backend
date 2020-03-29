@@ -11,6 +11,9 @@ from models.User import User
 from flask_jwt_extended import jwt_required, get_jwt_claims
 
 fileBP = Blueprint('app', __name__, url_prefix='/file')
+"""
+    Flask Blueprint for alternative file up&download and pdf export of user answers to questions through REST calls. 
+"""
 
 
 @fileBP.route('/download', methods=['GET'])
