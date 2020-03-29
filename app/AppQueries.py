@@ -255,7 +255,7 @@ class Query(ObjectType):
     @classmethod
     @query_jwt_required
     def resolve_me(cls, _, info):
-        return list(UserModel.objects.get(username=get_jwt_identity()))
+        return [UserModel.objects.get(username=get_jwt_identity())]
 
     @classmethod
     @query_jwt_required
