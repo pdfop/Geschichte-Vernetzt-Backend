@@ -38,11 +38,15 @@ def object_ingest(picture_dict):
                                      sub_category=row['Sammlungsbereich'], title=row['Titel'])
         # need to save once before we can call update()
         museum_object.save()
-        museum_object.update(set__description=str(row['Objektbeschreibung']))
-        museum_object.update(set__additional_information=str(row['additional']))
+        description = str(row['Objektbeschreibung'])
+        description = description.replace('\n', ' ')
+        museum_object.update(set__description=description)
+        additional_information = str(row['additional'])
+        additional_information = additional_information.replace('\n', ' ')
+        museum_object.update(set__additional_information=additional_information)
 
         # mostly the same procedure for each field. explained once
-        # convert to string because pandas will read numbers in cells as int or floar
+        # convert to string because pandas will read numbers in cells as int or float
         inter = str(row['Interdisciplinary'])
         # strip whitespaces left and right
         inter = inter.strip()

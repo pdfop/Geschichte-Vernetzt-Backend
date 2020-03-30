@@ -184,7 +184,7 @@ class ChangeUsername(Mutation):
         Parameters:
             token: String, jwt access token
             username: String, new user name
-        returns the updated user and True if successful
+        returns the updated user, a new refresh token bound to the new identity and True if successful
         returns Null and False if username already exists
         returns empty value for ok if token is invalid
     """
@@ -194,17 +194,18 @@ class ChangeUsername(Mutation):
 
     ok = Field(ProtectedBool)
     user = Field(lambda: User)
+    refresh_token = String()
 
     @classmethod
     @mutation_jwt_required
     def mutate(cls, _, info, username):
         if UserModel.objects(username=username):
-            return ChangeUsername(ok=BooleanField(boolean=False), user=None)
+            return ChangeUsername(ok=BooleanField(boolean=False), user=None, refresh_token=None)
         user = UserModel.objects.get(username=get_jwt_identity())
         user.update(set__username=username)
         user.save()
         user.reload()
-        return ChangeUsername(user=user, ok=BooleanField(boolean=True))
+        return ChangeUsername(user=user, ok=BooleanField(boolean=True), refresh_token=create_refresh_token(username))
 
 
 class Auth(Mutation):

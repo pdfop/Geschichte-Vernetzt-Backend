@@ -246,7 +246,7 @@ class Query(ObjectType):
     available_profile_pictures = List(String, token=String())
     """ returns all available badges """
     available_badges = List(Badge, token=String())
-    
+
     @classmethod
     @query_jwt_required
     def resolve_available_badges(cls, _, info):
