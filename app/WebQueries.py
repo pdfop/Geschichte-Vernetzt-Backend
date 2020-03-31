@@ -25,6 +25,8 @@ class Query(ObjectType):
     tour_feedback = List(TourFeedback, tour_id=String(), token=String())
     """ allows admins to query any tour """
     tour = List(Tour, token=String(), tour_id=String())
+    """ returns all tours to be listed in the admin panel """
+    all_tours = List(Tour, token=String())
     """ allows admins to query any checkpoint """
     checkpoint = List(CheckpointUnion, token=String(), checkpoint_id=String())
     """ allows admins to query all checkpoints that are part of a given tour """
@@ -35,6 +37,7 @@ class Query(ObjectType):
         accepts as few or many as needed. in the current iteration all text fields have to be queried using the EXACT 
         value in the database.
     """
+
     museum_object = List(MuseumObject, object_id=String(),
                          category=String(),
                          sub_category=String(),
@@ -109,6 +112,11 @@ class Query(ObjectType):
             if TourModel.objects(id=tour_id):
                 return list(TourModel.objects(id=tour_id))
         return []
+
+    @classmethod
+    @query_jwt_required
+    def resolve_all_tours(cls, _, info):
+        return TourModel.objects.all()
 
     @classmethod
     @query_jwt_required

@@ -1,5 +1,5 @@
 from flask_graphql_auth import get_jwt_identity, query_jwt_required
-from graphene import ObjectType, List, String
+from graphene import ObjectType, List, String, Int
 from app.Fields import User, Tour, MuseumObject, TourFeedback, CheckpointUnion, AnswerUnion, Badge
 from models.User import User as UserModel
 from models.Tour import Tour as TourModel
@@ -11,6 +11,7 @@ from models.ProfilePicture import ProfilePicture as ProfilePictureModel
 from models.Question import Question as QuestionModel
 from models.Answer import Answer as AnswerModel
 from models.Badge import Badge as BadgeModel
+from models.MultipleChoiceQuestion import MultipleChoiceQuestion as MCQuestionModel
 
 """
     These are the queries available to the App API. 
@@ -286,6 +287,21 @@ class Query(ObjectType):
         can only be called by the owner of the tour the question is in 
     """
     answers_by_user = List(AnswerUnion, token=String(), username=String(), tour_id=String())
+    """ given a tour id and an index returns the id of the checkpoint if and only if the checkpoint is a Question or 
+        MCQuestion
+    """
+    question_id = List(String, token=String(), tour_id=String(), index=Int())
+
+    @classmethod
+    @query_jwt_required
+    def resolve_question_id(cls, _, info, tour_id, index):
+        if TourModel.objects(id=tour_id):
+            tour = TourModel.objects.get(id=tour_id)
+            if CheckpointModel.objects(tour=tour, index=index):
+                checkpoint = CheckpointModel.objects.get(tour=tour, index=index)
+                if type(checkpoint) == MCQuestionModel or type(checkpoint) == QuestionModel:
+                    return [checkpoint.id]
+        return []
 
     @classmethod
     @query_jwt_required
