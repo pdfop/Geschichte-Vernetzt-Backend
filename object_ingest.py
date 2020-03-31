@@ -40,8 +40,12 @@ def object_ingest(picture_dict):
         museum_object.save()
         description = str(row['Objektbeschreibung'])
         description = description.replace('\n', ' ')
+        if description == 'nan':
+            description = ''
         museum_object.update(set__description=description)
         additional_information = str(row['additional'])
+        if additional_information == 'nan':
+            additional_information = ''
         additional_information = additional_information.replace('\n', ' ')
         museum_object.update(set__additional_information=additional_information)
 
@@ -50,33 +54,47 @@ def object_ingest(picture_dict):
         inter = str(row['Interdisciplinary'])
         # strip whitespaces left and right
         inter = inter.strip()
+        if inter == 'nan':
+            inter = ''
         museum_object.update(set__interdisciplinary_context=inter)
 
         year = str(row['Datierung'])
         # some fields had \xa0 characters in them. this is a non-line-breaking space so it's replaced by space
         year = year.replace(u'\xa0', u' ')
         year = year.strip()
+        if year == 'nan':
+            year = ''
         museum_object.update(set__year=year)
 
         art_type = str(row['Objektgattung'])
         art_type = art_type.strip()
+        if art_type == 'nan':
+            art_type = ''
         museum_object.update(set__art_type=art_type)
 
         creator = str(row['Hersteller'])
         creator = creator.replace(u'\xa0', u' ')
         creator = creator.strip()
+        if creator == 'nan':
+            creator = ''
         museum_object.update(set__creator=creator)
 
         material = str(row['Material'])
         material = material.strip()
+        if material == 'nan':
+            material = ''
         museum_object.update(set__material=material)
 
         size = str(row['Size'])
         size = size.strip()
+        if size == 'nan':
+            size = ''
         museum_object.update(set__size_=size)
 
         location = str(row['Verortung'])
         location = location.strip()
+        if location == 'nan':
+            location = ''
         museum_object.update(set__location=location)
 
         # museumObject.picture is a list of references to Picture documents.

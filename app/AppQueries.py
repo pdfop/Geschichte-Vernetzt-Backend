@@ -12,7 +12,7 @@ from models.Question import Question as QuestionModel
 from models.Answer import Answer as AnswerModel
 from models.Badge import Badge as BadgeModel
 from models.MultipleChoiceQuestion import MultipleChoiceQuestion as MCQuestionModel
-
+from models.MultipleChoiceAnswer import MultipleChoiceAnswer as MCAnswerModel
 """
     These are the queries available to the App API. 
     Included queries: 
@@ -352,3 +352,32 @@ class Query(ObjectType):
                             answers.append(answer)
                     return answers
         return []
+
+    """ given a user name and a tour id returns all answers the user gave to questions in this tour """
+    export_answers = String(token=String(), tour_id=String(), username=String())
+
+    @classmethod
+    @query_jwt_required
+    def resolve_export_answers(cls, _, info, tour_id, username):
+        if UserModel.objects(username=username):
+            user = UserModel.objects.get(username=username)
+            if TourModel.objects(id=tour_id):
+                tour = TourModel.objects.get(id=tour_id)
+                report = 'Antworten für den Nutzer {} im Rundgang {}.\n'.format(user.username, tour.name)
+                questions = QuestionModel.objects(tour=tour)
+                for question in questions:
+                    if AnswerModel.objects(user=user, question=question):
+                        answer = AnswerModel.objects.get(user=user, question=question)
+                        if type(answer) == MCAnswerModel:
+                            text_answers = []
+                            for index in answer.answer:
+                                text_answers.append(question.possible_answers[index])
+                            report = report + 'Frage: {}\n'.format(question.question)
+                            for ta in text_answers:
+                                report = report + 'Antwort: {}'.format(ta) + '\n'
+
+                        else:
+                            report = report + 'Frage: {}\n Antwort: {}\n'.format(question.question, answer.answer)
+
+                return report
+        return ""
