@@ -858,7 +858,7 @@ class CreateMCAnswer(Mutation):
         if UserModel.objects(username=username):
             user = UserModel.objects.get(username=username)
             # assert question exists
-            if QuestionModel.objects(id=question_id):
+            if MCQuestionModel.objects(id=question_id):
                 question = MCQuestionModel.objects.get(id=question_id)
             else:
                 return CreateAnswer(answer=None, ok=BooleanField(boolean=False), correct=0)
@@ -867,20 +867,26 @@ class CreateMCAnswer(Mutation):
             if user not in tour.users:
                 return CreateAnswer(answer=None, ok=BooleanField(boolean=False), correct=0)
             # creating and submitting a new answer
-            if not MCAnswerModel.objects(question=question, user=user):
+            #if not MCAnswerModel.objects(question=question, user=user):
                 # number of answers may not be more than permitted by the question
-                if len(answer) <= question.max_choices:
-                    correct = 0
-                    correct_answers = question.correct_answers
-                    for single_answer in answer:
-                        if single_answer in correct_answers:
-                            correct += 1
-                    answer = MCAnswerModel(question=question, user=user, answer=answer)
-                    answer.save()
-                    return CreateMCAnswer(answer=answer, ok=BooleanField(boolean=True), correct=correct)
-                else:
-                    return CreateMCAnswer(answer=None, ok=BooleanField(boolean=False), correct=-1)
-        return CreateMCAnswer(answer=None, ok=BooleanField(boolean=False), correct=0)
+            #if len(answer) <= question.max_choices:
+            correct = 0
+            correct_answers = question.correct_answers
+            for single_answer in answer:
+                if single_answer in correct_answers:
+                    correct += 1
+            if not MCAnswerModel.objects(question=question, user=user):
+                answer_ = MCAnswerModel(question=question, user=user, answer=answer)
+            else:
+                answer_ = MCAnswerModel.objects.get(question=question, user=user)
+                answer_.update(set__answer=answer)
+            answer_.save()
+            answer_.reload()
+            return CreateMCAnswer(answer=answer_, ok=BooleanField(boolean=True), correct=correct)
+            #else:
+                #return CreateMCAnswer(answer=None, ok=BooleanField(boolean=False), correct=-1)
+        else:
+            return CreateMCAnswer(answer=None, ok=BooleanField(boolean=False), correct=0)
 
 
 class CreateQuestion(Mutation):
