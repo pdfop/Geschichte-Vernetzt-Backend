@@ -101,7 +101,12 @@ def upload():
         description = request.args.get('description')
         name = request.args.get('name')
         cost = request.args.get('cost')
-        badge = Badge(id=id, name=name, cost=cost, description=description)
+        p = request.files['pic']
+        pic = ProfilePicture(locked=True)
+        pic.picture.put(p, content_type='image/jpeg')
+        pic.save()
+        pic.reload()
+        badge = Badge(id=id, name=name, cost=cost, description=description, unlocked_picture=pic)
         f = request.files['file']
         badge.picture.put(f, content_type='image/png')
         badge.save()

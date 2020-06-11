@@ -261,7 +261,7 @@ class ChooseProfilePicture(Mutation):
                 token, String, valid jwt access token
                 picture_id, String, valid object id of the ProfilePicture object on the server
         if successful returns true
-        if unsuccessful because the picture id was invalid returns False
+        if unsuccessful because the picture id was invalid or picture was not unlocked returns False
         if unsuccessful because the token was invalid returns empty value
         is successful if chosen picture is current picture
     """
@@ -280,9 +280,22 @@ class ChooseProfilePicture(Mutation):
             return ChooseProfilePicture(ok=BooleanField(boolean=False))
         else:
             picture = ProfilePictureModel.objects.get(id=picture_id)
-            user.update(set__profile_picture=picture)
-            user.save()
-            return ChooseProfilePicture(ok=BooleanField(boolean=True))
+            if not picture.locked:
+                user.update(set__profile_picture=picture)
+                user.save()
+                user.reload()
+                return ChooseProfilePicture(ok=BooleanField(boolean=True))
+            else:
+                pics = []
+                for badge in user.badges:
+                    pics.append(badge.unlocked_picture)
+                if picture in pics:
+                    user.update(set__profile_picture=picture)
+                    user.save()
+                    user.reload()
+                    return ChooseProfilePicture(ok=BooleanField(boolean=True))
+                else:
+                    return ChooseProfilePicture(ok=BooleanField(boolean=False))
 
 
 class DeleteAccount(Mutation):

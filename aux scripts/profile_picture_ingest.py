@@ -5,7 +5,8 @@ from mongoengine import register_connection
 from models.ProfilePicture import ProfilePicture
 """
 Ingestion script for profile pictures. Allows adding profile pictures to the database in bulk. Pictures are assumed to 
-be in jpg format and located at data/profilepictures relative to the location of this script. 
+be in jpg format and located at data/profilepictures/free relative to the location of this script. 
+Use only to add free/unlocked pictures. Locked Profile Pictures that are associated with Badges are added with the Badge. 
 """
 
 # connect to database. assumes default port and no password
@@ -16,7 +17,7 @@ register_connection("file", "file")
 
 def ingest_profile_pictures():
     # data path relative to this script
-    file_path = 'data/profilepictures'
+    file_path = 'data/profilepictures/free'
     # iterating through the directory
     with os.scandir(file_path) as directory:
         for file in directory:

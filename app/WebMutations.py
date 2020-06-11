@@ -607,7 +607,8 @@ class CreateBadge(Mutation):
                 token, String, valid jwt access token of an admin
                 name, String, name of the badge
                 badge_id, String, unique ID of the badge
-                picture, Upload, expects a png image. used as icon for the badge
+                icon, Upload, expects a jpeg image. used as icon for the badge
+                profile_picture, Upload, expects a jpeg image, the profile pictures users can unlock with the badge
                 description, String, description text of the badge
                 cost, Int, number of points needed to receive the badge
         if successful returns the new badge object and True
@@ -619,7 +620,8 @@ class CreateBadge(Mutation):
         token = String(required=True)
         name = String(required=True)
         badge_id = String(required=True)
-        picture = Upload(required=True)
+        icon = Upload(required=True)
+        profile_picture = Upload(required=True)
         description = String(required=True)
         cost = Int(required=True)
 
@@ -628,13 +630,17 @@ class CreateBadge(Mutation):
 
     @classmethod
     @mutation_jwt_required
-    def mutate(cls, _, info, name, badge_id, picture, description, cost):
+    def mutate(cls, _, info, name, badge_id, icon, description, cost, profile_picture):
         # ensure caller is admin
         if get_jwt_claims() == admin_claim:
             # ensure badge id is unique
             if not BadgeModel.objects(id=badge_id):
-                badge = BadgeModel(id=badge_id, name=name, description=description, cost=cost)
-                badge.picture.put(picture, content_type='image/png')
+                pic = ProfilePictureModel(locked=True)
+                pic.picture.put(profile_picture, content_type='image/jpeg')
+                pic.save()
+                pic.reload()
+                badge = BadgeModel(id=badge_id, name=name, description=description, cost=cost, unlocked_picture=pic)
+                badge.picture.put(icon, content_type='image/jpeg')
                 badge.save()
                 badge.reload()
                 # add badge to the progress dict of all users.
@@ -709,7 +715,8 @@ class UpdateBadge(Mutation):
         Parameters:
             token, String, valid jwt access token with admin claim
             badge_id, String, id of the badge to edit
-            picture, Upload, image in png format
+            icon, Upload, image in jpeg format
+            profile_picture, Upload, image in jpeg format
             name, String, new name for the badge
             description, String, new description for the Badge
             cost, Int, new cost of the Badge
@@ -725,7 +732,8 @@ class UpdateBadge(Mutation):
     class Arguments:
         badge_id = String(required=True)
         token = String(required=True)
-        picture = Upload()
+        icon = Upload()
+        profile_picture = Upload()
         name = String()
         description = String()
         cost = Int()
@@ -746,11 +754,12 @@ class UpdateBadge(Mutation):
         # get badge to modify
         badge = BadgeModel.objects.get(id=badge_id)
         # get optional parameters
-        picture = kwargs.get('picture', None)
+        icon = kwargs.get('picture', None)
         name = kwargs.get('name', None)
         description = kwargs.get('description', None)
         cost = kwargs.get('cost', None)
         new_id = kwargs.get('new_id', None)
+        profile_picture = kwargs.get('profile_picture', None)
         if new_id is not None:
             # ensure new badge id is also unique
             if not BadgeModel.objects(id=new_id):
@@ -763,8 +772,13 @@ class UpdateBadge(Mutation):
             badge.update(set__cost=cost)
         if description is not None:
             badge.update(set__description=description)
-        if picture is not None:
-            badge.picture.replace(picture, content_type='image/png')
+        if icon is not None:
+            badge.picture.replace(icon, content_type='image/jpeg')
+        if profile_picture is not None:
+            pic = badge.unlocked_picture
+            pic.picture.replace(profile_picture, content_type='image/jpeg')
+            pic.save()
+            pic.reload()
         badge.save()
         # reload so updated object is returned
         badge.reload()
