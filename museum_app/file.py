@@ -1,5 +1,5 @@
 import io
-from flask import Blueprint, send_file, request, jsonify
+from flask import Blueprint, send_file, request, jsonify, render_template
 from app.WebMutations import admin_claim
 from models.Answer import Answer
 from models.Checkpoint import Checkpoint
@@ -8,7 +8,8 @@ from models.Picture import Picture
 from models.ProfilePicture import ProfilePicture
 from models.Badge import Badge
 from models.User import User
-from flask_jwt_extended import jwt_required, get_jwt_claims
+import datetime
+from flask_jwt_extended import jwt_required, get_jwt_claims, get_jwt_identity
 
 fileBP = Blueprint('app', __name__, url_prefix='/file')
 """
@@ -170,3 +171,18 @@ def generatepdf():
         return send_file(file, attachment_filename='report.txt', mimetype='text/plain')
     else:
         return jsonify({"Error": "Invalid type"})
+
+
+@fileBP.route('/export/', methods=['GET'])
+@jwt_required
+def generatereport():
+    username = get_jwt_identity()
+    now = datetime.datetime.now()
+    res = render_template('report',
+                          username=username,
+                          year=now.year,
+                          month=now.month,
+                          day=now.day,
+                          hour=now.hour,
+                          minute=now.minute)
+    return res

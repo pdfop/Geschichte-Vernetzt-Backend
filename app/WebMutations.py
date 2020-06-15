@@ -1,3 +1,5 @@
+import datetime
+
 from flask_graphql_auth import create_access_token, create_refresh_token, mutation_jwt_refresh_token_required, \
     get_jwt_identity, mutation_jwt_required, get_jwt_claims
 from graphene import ObjectType, List, Mutation, String, Field, Boolean, Int
@@ -22,7 +24,7 @@ import string
 import random
 from app.ProtectedFields import StringField, ProtectedString, BooleanField, ProtectedBool
 from app.Fields import Tour, MuseumObject, Admin, User, Picture, Badge, CheckpointUnion, ProfilePicture
-
+from copy import deepcopy
 """
 These are the mutations available in the web portal 
 Tasks: create and manage admin accounts 
@@ -558,10 +560,26 @@ class AcceptReview(Mutation):
         if get_jwt_claims() == admin_claim:
             if TourModel.objects(id=tour_id):
                 tour = TourModel.objects.get(id=tour_id)
-                tour.update(set__status='featured')
-                tour.save()
-                tour.reload()
-                return AcceptReview(ok=BooleanField(boolean=True), tour=tour)
+                featured_tour = TourModel(owner=UserModel.objects.get(username=get_jwt_identity()),
+                                          status='featured',
+                                          difficulty=tour.difficulty,
+                                          name=tour.name,
+                                          description=tour.description,
+                                          session_id=tour.session_id,
+                                          search_id=tour.search_id + str(datetime.datetime.now()),
+                                          current_checkpoints=tour.current_checkpoints)
+                featured_tour.save()
+                featured_tour.reload()
+                print("out")
+                for checkpoint in CheckpointModel.objects(tour=tour):
+                    print("in")
+                    cp = deepcopy(checkpoint)
+                    cp.tour = featured_tour
+                    cp.id = None
+                    cp.save()
+                    cp.reload()
+
+                return AcceptReview(ok=BooleanField(boolean=True), tour=featured_tour)
             else:
                 return AcceptReview(ok=BooleanField(boolean=False), tour=None)
         else:

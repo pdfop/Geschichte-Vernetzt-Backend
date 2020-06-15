@@ -16,8 +16,10 @@ register_connection("file", "file")
 
 
 def ingest_profile_pictures():
-    # data path relative to this script
-    file_path = 'data/profilepictures/free'
+    # data path
+    dir_path = os.path.abspath(__file__)
+    dir_path = os.path.dirname(os.path.dirname(dir_path))
+    file_path = os.path.join(dir_path, 'data/profilepictures/free')
     # iterating through the directory
     with os.scandir(file_path) as directory:
         for file in directory:
