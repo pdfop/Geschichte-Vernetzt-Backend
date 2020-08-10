@@ -56,7 +56,8 @@ def ingest_badges():
                                 if profile_pic_file.is_file():
                                     if name in profile_pic_file.path:
                                         with open(profile_pic_file.path, 'rb') as profile_picture:
-                                            pic = ProfilePicture(locked=True)
+                                            pic = ProfilePicture()
+                                            pic.update(set__locked=True)
                                             pic.picture.put(profile_picture, content_type='image/jpeg')
                                             pic.save()
                                             pic.reload()
