@@ -57,8 +57,10 @@ def ingest_badges():
                                     if name in profile_pic_file.path:
                                         with open(profile_pic_file.path, 'rb') as profile_picture:
                                             pic = ProfilePicture()
-                                            pic.update(set__locked=True)
                                             pic.picture.put(profile_picture, content_type='image/jpeg')
+                                            pic.save()
+                                            pic.update(set__locked=True)
+                                            pic.reload()
                                             pic.save()
                                             pic.reload()
                         badge_name = name.replace('_', ' ')
