@@ -32,7 +32,7 @@ def ingest_profile_pictures():
                     # mode HAS to be rb for mongoengine to be able to read the file
                     with open(file.path, 'rb') as picture:
                         # defining document
-                        pic = ProfilePicture(locked=False)
+                        pic = ProfilePicture()
                         # adding data to GridFS FileField
                         pic.picture.put(picture, content_type='image/jpeg')
                         # saving
