@@ -1,7 +1,7 @@
 from mongoengine import *
 
 
-class ProfilePicture(Document):
+class ProfilePicture(DynamicDocument):
     """
     Model for user profile pictures.
     Separated from regular pictures on the model level
@@ -10,4 +10,4 @@ class ProfilePicture(Document):
     meta = {'db_alias': 'file',
             'collection': 'profilepicture'}
     picture = FileField(content_type='image/jpeg')
-    locked = BooleanField(required=True, default=False)
+    locked = BooleanField(default=False)
