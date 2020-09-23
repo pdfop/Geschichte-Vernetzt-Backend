@@ -30,6 +30,7 @@ td {
     <h3>Antworten aller Teilnehmer des Rundgangs {{tourname}} von {{ownername}}</h3>
     <h4>generiert am {{day}}/{{month}}/{{year}} um {{hour}}:{{minute}} von {{username}}</h4>
     <h5> Frage: {{question}} </h5>
+    <h5> Bezugsobjekt: {{museumObject}} </h5>
     <table>
      <tr>
         <th>Benutzer</th>

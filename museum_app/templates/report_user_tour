@@ -33,6 +33,7 @@ td {
     <table>
      <tr>
         <th>Frage</th>
+        <th>Bezugsobjekt</th>
         <th>Antwort</th>
         <th>Richtige Antwort</th>
      </tr>
@@ -41,6 +42,7 @@ td {
             <td> {{answer[0]}}
             <td> {{answer[1]}}
             <td> {{answer[2]}}
+            <td> {{answer[3]}}
          </tr>
      {% endfor %}
      </table>

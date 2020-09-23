@@ -210,9 +210,9 @@ def generate_report():
     tour_id = request.args.get('tour')
     tour = None
     res = "404"
-    if Tour.objects(id=tour_id):
-        tour = Tour.objects.get(id=tour_id)
     if type == 'user':
+        if Tour.objects(id=tour_id):
+            tour = Tour.objects.get(id=tour_id)
         if tour is not None:
             if user == tour.owner or get_jwt_claims() == admin_claim:
                 target_username = request.args.get('user')
@@ -225,11 +225,22 @@ def generate_report():
                         # TODO: assert equal lengths of lists here and possibly build a dict
                         answers.extend(Answer.objects(question=question, user=target_user))
                     for answer in answers:
-                        if isinstance(answer, MultipleChoiceAnswer):
-                            compiled.append((str(answer.question.question), str(answer.answer),
-                                             ' '.join(answer.question.correct_answer)))
+                        if answer.question.linked_objects:
+                            linked_object = answer.question.linked_objects[0].title
                         else:
-                            compiled.append((str(answer.question.question), str(answer.answer), 'not available'))
+                            linked_object = "nicht angegeben"
+                        if isinstance(answer, MultipleChoiceAnswer):
+                            compiled.append((str(answer.question.question),
+                                             str(linked_object),
+                                             ',\n'.join([str(answer.question.possible_answers[given])
+                                                         for given in answer.answer]),
+                                             ',\n'.join([str(answer.question.possible_answers[correct])
+                                                         for correct in answer.question.correct_answers])))
+                        else:
+                            compiled.append((str(answer.question.question),
+                                             str(linked_object),
+                                             str(answer.answer),
+                                             'not available'))
 
                     res = render_template('report_user_tour',
                                           username=username,
@@ -257,7 +268,7 @@ def generate_report():
                     print(answer.user.username)
                     if isinstance(answer, MultipleChoiceAnswer):
                         compiled.append((str(answer.user.username), str(answer.answer),
-                                         ' '.join(answer.question.correct_answer)))
+                                         ' '.join(str(answer.question.correct_answer))))
                     else:
                         compiled.append((str(answer.user.username), str(answer.answer), 'not available'))
 
@@ -265,6 +276,7 @@ def generate_report():
                                       username=username,
                                       question_id=str(question_id),
                                       question=str(question.question),
+                                      museumObject=str(question.linked_objects[0].title),
                                       day=now.day,
                                       year=now.year,
                                       month=now.month,
@@ -274,8 +286,9 @@ def generate_report():
                                       ownername=tour.owner.username,
                                       answers=compiled
                                       )
-
     elif type == 'me':
+        if Tour.objects(id=tour_id):
+            tour = Tour.objects.get(id=tour_id)
         if tour is not None:
             if user in tour.users:
                 questions = Question.objects(tour=tour)
@@ -285,11 +298,22 @@ def generate_report():
                     # TODO: assert equal lengths of lists here and possibly build a dict
                     answers.extend(Answer.objects(question=question, user=user))
                 for answer in answers:
-                    if isinstance(answer, MultipleChoiceAnswer):
-                        compiled.append((str(answer.question.question), str(answer.answer),
-                                         ' '.join(answer.question.correct_answer)))
+                    if answer.question.linked_objects:
+                        linked_object = answer.question.linked_objects[0].title
                     else:
-                        compiled.append((str(answer.question.question), str(answer.answer), 'not available'))
+                        linked_object = "nicht angegeben"
+                    if isinstance(answer, MultipleChoiceAnswer):
+                        compiled.append((str(answer.question.question),
+                                         str(linked_object),
+                                        ',\n'.join([str(answer.question.possible_answers[given])
+                                                    for given in answer.answer]),
+                                         ',\n'.join([str(answer.question.possible_answers[correct])
+                                                     for correct in answer.question.correct_answers])))
+                    else:
+                        compiled.append((str(answer.question.question),
+                                         str(linked_object),
+                                         str(answer.answer),
+                                         'not available'))
 
                 res = render_template('report_me_tour',
                                       username=username,
